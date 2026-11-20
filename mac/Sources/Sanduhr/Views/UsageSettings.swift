@@ -219,6 +219,7 @@ struct UsageSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            SourcesSettingsView(vm: vm, t: theme)
             switch SignedOut.usageState(label: navigation.usagePage.label(vm), demo: vm.demo,
                                         usageOff: vm.status == .usageOff) {
             case .account(let label):

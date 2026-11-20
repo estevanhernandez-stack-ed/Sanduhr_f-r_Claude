@@ -94,7 +94,50 @@ struct MenuBarReading: Equatable {
     let text: String
 }
 
+/// What the status item shows: the reading beside the hourglass and the button's tooltip.
+struct MenuBarDisplay: Equatable {
+    let reading: MenuBarReading?
+    /// Set only when it has something to add: another source further out, or a stale Codex primary.
+    let tooltip: String?
+}
+
 enum MenuBarText {
+    /// The status item with more than one source (agent sources design, section 2): the reading
+    /// follows `primary` under `mode`, and the tooltip is Windows' tray clause. It names the primary
+    /// and the other source when that one has a current number further out for the reading's window
+    /// ("Claude week 40%. Codex week 70%."), and says "as of earlier" for a Codex primary whose
+    /// reading is old. The text stays a number either way. With only Claude on there is no tooltip
+    /// and the text is `reading(_:mode:step:usageOn:)`'s, as it always was.
+    /// - Parameters:
+    ///   - claudeOn: Claude usage is on; off, Claude has no reading and is never named.
+    ///   - codexOn: Codex is on; off, whatever numbers are held are ignored.
+    ///   - codexFresh: the Codex tiers whose number is current (`CodexUsageService.freshTiers`).
+    static func display(primary: AgentSource, claude: UsageResponse?, claudeOn: Bool,
+                        codex: UsageResponse?, codexOn: Bool, codexFresh: Set<Tier>,
+                        mode: MenuBarMode, step: Int) -> MenuBarDisplay {
+        let lead: AgentSource = codexOn && primary == .codex ? .codex : .claude
+        let shown = lead == .codex ? codex : claude
+        guard let reading = reading(shown, mode: mode, step: step, usageOn: lead == .codex || claudeOn) else {
+            return MenuBarDisplay(reading: nil, tooltip: nil)
+        }
+        let tier = reading.tier
+        let word = tier == .fiveHour ? "5h" : "week"
+        let leadStale = lead == .codex && !codexFresh.contains(tier)
+        var clause = "\(lead.displayName) \(word) \(reading.percent)%" + (leadStale ? ", as of earlier." : ".")
+
+        // The other source, when it has a current number further out in the same window.
+        let other: AgentSource = lead == .codex ? .claude : .codex
+        let otherOn = other == .codex ? codexOn : claudeOn
+        let otherUsage = other == .codex ? codex : claude
+        let otherFresh = other == .codex ? codexFresh.contains(tier) : true
+        var named = false
+        if otherOn, otherFresh, let util = otherUsage?.tiers[tier]?.utilization, Int(util) > reading.percent {
+            clause += " \(other.displayName) \(word) \(Int(util))%."
+            named = true
+        }
+        return MenuBarDisplay(reading: reading, tooltip: named || leadStale ? clause : nil)
+    }
+
     /// The reading for `mode`, nil with neither the session nor the weekly limit (the menu bar
     /// then shows the hourglass alone). A chosen limit that is missing falls back to the other.
     /// `step` counts Rotate's turns: even shows the session, odd the weekly limit.
