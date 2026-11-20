@@ -25,6 +25,9 @@ struct AlertSettings: Equatable {
     var sessionReset = false
     var weeklyReset = false
     var pace = false
+    /// Codex's limits alert too (agent sources, item 4). Off until turned on, so a Mac that ticks
+    /// Codex does not start alerting by surprise. Claude's alerts never read it.
+    var codexAlerts = false
     var delivery: AlertDelivery = .banner
     var quietEnabled = false
     /// Minutes since midnight.
@@ -43,6 +46,7 @@ struct AlertSettings: Equatable {
         sessionReset = d.bool(forKey: Notifier.Key.sessionReset)
         weeklyReset = d.bool(forKey: Notifier.Key.weeklyReset)
         pace = d.bool(forKey: Notifier.Key.pace)
+        codexAlerts = d.bool(forKey: Notifier.Key.codexAlerts)
         delivery = (d.object(forKey: Notifier.Key.delivery) as? String).flatMap(AlertDelivery.init) ?? delivery
         quietEnabled = d.bool(forKey: Notifier.Key.quietEnabled)
         quietStart = d.object(forKey: Notifier.Key.quietStart) as? Int ?? quietStart
@@ -65,7 +69,7 @@ enum AlertSound {
 }
 
 /// One alert to show: what it says, which limit it is about, and the key that keeps it to once
-/// per reset window ("<tier>|<resetsAt>|<kind>").
+/// per reset window ("<tier>|<resetsAt>|<kind>", with a "codex|" prefix for Codex's).
 struct AlertDecision: Equatable {
     enum Kind: String { case line, full, pace, reset }
     let kind: Kind
@@ -86,6 +90,17 @@ struct AlertOutcome: Equatable {
     var quiet = false
 }
 
+/// What an alert calls a limit. Claude's wording is what it always was ("Session", "Weekly — All
+/// Models"); Codex's says "Codex 5-hour" and "Codex weekly".
+enum AlertWording {
+    static func name(_ tier: Tier, source: AgentSource) -> String {
+        switch source {
+        case .claude: return tier == .fiveHour ? "Session" : tier.label
+        case .codex, .antigravity: return "\(source.displayName) \(tier == .fiveHour ? "5-hour" : "weekly")"
+        }
+    }
+}
+
 /// The alert decisions, kept apart from UserNotifications and AppKit so they can be tested.
 /// Notifier hands in the latest usage, the one before it, the settings and the keys already
 /// fired; it gets back what to show and where.
@@ -99,12 +114,18 @@ enum AlertRules {
     static func evaluate(usage: UsageResponse, previous: UsageResponse?, settings s: AlertSettings,
                          fired: Set<String>, deskRunning: Bool, now: Date,
                          hidden: Set<Tier> = [],
+                         source: AgentSource = .claude, freshTiers: Set<Tier>? = nil,
                          calendar: Calendar = .current) -> AlertOutcome {
         guard s.enabled else { return AlertOutcome() }
+        // A source that is not Claude alerts on its own switch, and only on limits that are fresh
+        // (`freshTiers`): an old log never raises one.
+        if source != .claude, !(source == .codex && s.codexAlerts) { return AlertOutcome() }
+        // Claude's keys are "<tier>|<window>|<kind>" as ever; another source's gain "<source>|".
+        let prefix = source == .claude ? "" : "\(source.rawValue)|"
         var alerts: [AlertDecision] = []
         var seen = fired
         func add(_ kind: AlertDecision.Kind, _ tier: Tier, _ window: String, _ title: String, _ body: String) {
-            let key = "\(tier.rawValue)|\(window)|\(kind.rawValue)"
+            let key = "\(prefix)\(tier.rawValue)|\(window)|\(kind.rawValue)"
             guard seen.insert(key).inserted else { return }
             alerts.append(AlertDecision(kind: kind, tier: tier, title: title, body: body, onceKey: key))
         }
@@ -112,15 +133,16 @@ enum AlertRules {
         // A limit hidden in Settings, Alerts, Each limit never alerts (MeterVisibility).
         let shown = MeterVisibility.visible(usage, hidden: hidden) ?? usage
         for tier in Tier.allCases {
+            if let freshTiers, !freshTiers.contains(tier) { continue }
             guard let t = shown.tiers[tier], let util = t.utilization else { continue }
             let window = t.resetsAt ?? "no-reset"
-            let name = tier == .fiveHour ? "Session" : tier.label
+            let name = AlertWording.name(tier, source: source)
             let resets = resetText(t.resetsAt, now: now, calendar: calendar)
             if util >= (tier == .fiveHour ? s.sessionLine : s.weeklyLine) {
                 add(.line, tier, window, "\(name) at \(Int(util))%", resets)
             }
             if tier == .fiveHour, s.sessionFull, util >= 100 {
-                add(.full, tier, window, "Session limit reached", resets)
+                add(.full, tier, window, source == .claude ? "Session limit reached" : "\(name) limit reached", resets)
             }
             if s.pace, util >= paceMinUtil,
                let elapsed = paceFrac(t.resetsAt, tier: tier, now: now), elapsed >= paceMinElapsed,
@@ -134,16 +156,17 @@ enum AlertRules {
                 // reset time yet.
                 let ended = before.resetsAt ?? "ended-\(Int(now.timeIntervalSince1970))"
                 if tier == .fiveHour {
-                    add(.reset, tier, ended, "Session reset", "Your 5-hour window is fresh.")
+                    add(.reset, tier, ended, source == .claude ? "Session reset" : "\(name) reset", "Your 5-hour window is fresh.")
                 } else {
-                    add(.reset, tier, ended, "\(tier.label) reset", "A fresh week starts now.")
+                    add(.reset, tier, ended, "\(name) reset", "A fresh week starts now.")
                 }
             }
         }
 
         guard !alerts.isEmpty else { return AlertOutcome() }
         let quiet = s.quietEnabled && isQuiet(now, start: s.quietStart, end: s.quietEnd, calendar: calendar)
-        let route = route(s.delivery, deskRunning: deskRunning, quiet: quiet)
+        // The Desk's meters are Claude's: another source's alert is a banner, never a pulse on them.
+        let route = route(s.delivery, deskRunning: deskRunning && source == .claude, quiet: quiet)
         return AlertOutcome(alerts: alerts, banner: route.banner, pulse: route.pulse, quiet: quiet)
     }
 
