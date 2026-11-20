@@ -7,8 +7,21 @@ import Foundation
 /// newest release it covers and lists every release it spans (`versions:`).
 extension WhatsNew {
     static var table: [WhatsNewCard] {
-        release2450 + release2440 + release2430 + release2420 + release2410 + release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
+        release2460 + release2450 + release2440 + release2430 + release2420 + release2410 + release2400 + release2390 + release2380 + release2370 + release2360 + release2350 + release2340 + release2330 + release2320 + release2310 + release2300 + release2290 + release2280 + release2270 + release2260 + release2250 + release2240 + release2230 + release2220 + release2210 + release2200 + release2190 + release2180 + release2170 + release2160 + release2150 + release2140 + release2130 + release2120 + release2110 + release2100 + release290 + release280 + release270 + release260 + release250 + release240
     }
+
+    static let release2460: [WhatsNewCard] = [
+        WhatsNewCard(
+            version: "2.46.0", id: "codex-limits",
+            title: "Codex limits, beside Claude's",
+            body: "Turn on Codex in Settings, Usage, Sources and the widget shows its 5-hour and weekly limits under Claude's. Sanduhr reads Codex's own logs on this Mac, so there's no sign-in.",
+            art: .symbol("gauge.with.dots.needle.67percent"), destination: .usage),
+        WhatsNewCard(
+            version: "2.46.0", id: "every-agents-burn",
+            title: "Every agent's burn on the Usage page",
+            body: "Codex and the Antigravity CLI join Claude Code on the Usage page and in the widget footer. Antigravity counts activity only, and both are read from files on this Mac.",
+            art: .symbol("chart.bar.xaxis"), destination: .usage),
+    ]
 
     static let release2450: [WhatsNewCard] = [
         WhatsNewCard(
