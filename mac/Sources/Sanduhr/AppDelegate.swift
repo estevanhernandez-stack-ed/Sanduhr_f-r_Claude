@@ -156,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: .sanduhrSourcesDidChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.syncCodexSource()
+                self?.viewModel.vault.trigger()   // Antigravity switched on: its record catches up now
                 self?.fitPanelToContent()
                 self?.renderStatusItem()
             }

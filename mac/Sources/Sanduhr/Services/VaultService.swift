@@ -48,18 +48,28 @@ enum VaultAgentStop {
 }
 
 /// The agent roots to ingest now (every-agents spec, section 3): Codex while its setup switch is
-/// on and a Codex home exists. Agent roots are not accounts, so there is no Keep a record gate.
+/// on and a Codex home exists, the Antigravity CLI while `sources.antigravity.on` is set and its
+/// folder exists. Agent roots are not accounts, so there is no Keep a record gate.
 enum VaultAgents {
-    static func active(setup: SetupSettings?, sources: AgentSourceSettings, codexHomes: () -> [URL]) -> [AgentBurnSource] {
+    static func active(setup: SetupSettings?, sources: AgentSourceSettings, codexHomes: () -> [URL],
+                       antigravityHome: () -> URL? = { AntigravityBurnReader.liveHome() }) -> [AgentBurnSource] {
         var out: [AgentBurnSource] = []
         if sources.isOn(.codex, setup: setup) {
             let homes = codexHomes()
             if !homes.isEmpty { out.append(CodexBurnReader(homes: homes)) }
         }
+        if sources.isOn(.antigravity, setup: setup), let home = antigravityHome(), isFolder(home) {
+            out.append(AntigravityBurnReader(home: home))
+        }
         return out
     }
 
-    /// This Mac's: the stored setup and sources, the real Codex homes.
+    private static func isFolder(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    /// This Mac's: the stored setup and sources, the real Codex and Antigravity folders.
     static func live() -> [AgentBurnSource] {
         active(setup: SetupStore.load(), sources: AgentSourceSettings.load(), codexHomes: CodexHomes.live)
     }
