@@ -289,4 +289,16 @@ struct SourcesSettingsTests {
         #expect(appStore.values.isEmpty)
         #expect(host.calls.isEmpty)
     }
+
+    @Test func switchingAntigravityOnAgainClearsAnEraseStop() throws {
+        let model = makeModel()
+        model.setOn(.antigravity, true)
+        VaultAgentStop.stop(.antigravity, in: appStore)   // its record erased while on
+        model.setOn(.antigravity, true)
+        #expect(VaultAgentStop.isStopped(.antigravity, in: appStore))   // on to on keeps the stop
+        model.setOn(.antigravity, false)
+        #expect(VaultAgentStop.isStopped(.antigravity, in: appStore))   // off keeps it too
+        model.setOn(.antigravity, true)
+        #expect(!VaultAgentStop.isStopped(.antigravity, in: appStore))
+    }
 }
