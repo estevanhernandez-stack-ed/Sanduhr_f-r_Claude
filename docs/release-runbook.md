@@ -11,8 +11,10 @@
 > 1. **Microsoft Store** — two unsigned MSIX packages (`windows-dotnet/dist/Sanduhr-Store-x64-v<v>.msix`
 >    and `Sanduhr-Store-arm64-v<v>.msix`), Partner Center re-signs after upload. Reuses the existing listing under identity
 >    `626LabsLLC.SanduhrfrClaude`.
-> 2. **GitHub Release** — Velopack `sanduhr-win-Setup.exe` + delta `.nupkg` + `releases.win.json`
->    (the in-app `UpdateChecker` auto-update channel).
+> 2. **GitHub Release** — Velopack installers for both architectures, `626Labs.Sanduhr-win-Setup.exe`
+>    (x64) and `626Labs.Sanduhr-win-arm64-Setup.exe`, with their full and delta `.nupkg` files and
+>    the two feeds, `releases.win.json` (x64) and `releases.win-arm64.json` (the in-app
+>    `UpdateChecker` auto-update channel).
 >
 > Both ship from the same tag. The .NET rebuild's first Store submission (**v3.0.0.0**) replaces
 > the Python build in the SAME listing — same Identity Name and Publisher CN, so it's an update,
@@ -125,6 +127,9 @@ powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -
   The arm64 package's server, and the arm64 app itself, are run by the Arm check workflow in
   Phase 6, on the draft release, before anything is published.
 
+  The local arm64 package only proves the arm64 build works on this PC. It is not the one
+  submitted: Phase 7 submits the draft's own packages, the ones the Arm check ran.
+
 Optional local install test (sideload): build a self-signed flavor whose cert subject CN matches
 the manifest Publisher, import the cert into Trusted People, then `Add-AppxPackage`:
 
@@ -136,16 +141,19 @@ powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -
 
 ## Phase 4 — Build the Velopack release (GitHub channel)
 
+First fetch the previous release's full packages and feeds into `dist/release/`, so `vpk` can
+compute a delta. `--clobber` overwrites what the last release left there: older files in the folder
+are harmless, but the feeds and full packages must be the previous release's.
+
+```powershell
+gh release download v<prev> --pattern "*-full.nupkg" --pattern "releases.win.json" --dir windows-dotnet/dist/release --clobber
+```
+
+Then build, x64 first, then arm64, both into `dist/release/`:
+
 ```powershell
 pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0 -Runtime win-x64 -NoClean
 pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0 -Runtime win-arm64 -NoClean
-```
-
-x64 first, then arm64, both into `dist/release/`. Before building, fetch the previous release's
-full packages and feeds into `dist/release/` so `vpk` can compute a delta:
-
-```powershell
-gh release download v<prev> --pattern "*-full.nupkg" --pattern "releases.win.json" --dir windows-dotnet/dist/release
 ```
 
 `*-full.nupkg` matches both architectures' full packages. From the release after 5.0 on, also pass
@@ -211,7 +219,7 @@ $repo = 'estevanhernandez-stack-ed/Sanduhr_f-r_Claude'
 # The Arm check: runs the draft's own arm64 files on an Arm runner. It fails if a file or a feed
 # is missing, runs the arm64 Store package's contents, and installs the x64 installer and then
 # the arm64 one over it. Publish only when its `draft` job is green.
-Get-Date -AsUTC -Format o   # the moment of the dispatch
+(Get-Date).ToUniversalTime().ToString('o')   # the moment of the dispatch
 & $gh workflow run windows-dotnet-arm-check.yml --repo $repo --ref main -f tag=v<v>
 Start-Sleep -Seconds 10     # a dispatch registers a moment after the command returns
 & $gh run list --repo $repo --workflow windows-dotnet-arm-check.yml --event workflow_dispatch --limit 1 --json databaseId,createdAt,status,displayTitle
@@ -224,6 +232,19 @@ Start-Sleep -Seconds 10     # a dispatch registers a moment after the command re
 The listing's `createdAt` must be later than the moment of the dispatch; if it is not, you are
 looking at an earlier run, so list again. Watch that run's id, and publish only when the `draft` job
 of that run is green.
+
+**If the check is red:**
+
+- **"Download the draft's files" fails with not-found.** The workflow's token cannot read a draft's
+  files. The fallback is a workflow change, not yet run: the release job uploads its files as a run
+  artifact, and the `draft` job takes a `run_id` input and fetches them with `gh run download`.
+  Make that change as its own pull request, with the failing log quoted, and run the check again.
+- **The asset check names a missing file.** Upload that file to the draft and run the check again.
+- **An installer, launch or switch step fails.** Do not publish. Do not delete the arm64 files and
+  publish x64 alone either: the 5.0 x64 build tells every Arm PC that a native build exists and
+  links to this release, so an x64-only 5.0 first needs a build without the notice (the spec's cut
+  order pairs the arm64 installer with the notice for this reason). Fix the cause in the step
+  that failed, not the check.
 
 The check's first step fails a draft that is missing any of the ten files (five per architecture).
 Before publishing, confirm there is exactly one draft for the tag (`gh release list`); the check
@@ -266,7 +287,13 @@ reviewer letters stay here because they never go through the API.
    ```powershell
    python engine/console.py apps/sanduhr --json     # -> out/sanduhr-listing.json; ready + apiReady must hold
    ```
-3. **Package by hand, on the submission the API created.** Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
+3. **Package by hand, on the submission the API created.** The packages that go to the Store are
+   the draft's own, the ones the Arm check ran, not the Phase 3 local builds, which nobody on the
+   project can run on Arm. Once the Arm check is green, fetch them over the local ones:
+   ```powershell
+   gh release download v<v> --pattern "Sanduhr-Store-*.msix" --dir windows-dotnet/dist --clobber
+   ```
+   Then Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
    **both** packages into the slot, `windows-dotnet/dist/Sanduhr-Store-x64-v<v>.msix` and
    `windows-dotnet/dist/Sanduhr-Store-arm64-v<v>.msix`, and wait for both to upload and validate.
    The Store gives each device the package for its processor. The Store Listing Console's

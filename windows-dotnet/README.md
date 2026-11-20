@@ -387,7 +387,7 @@ Partner Center submission, and the 10.1.4.4 acceptance gates — lives in
 
 ## Architectures
 
-Sanduhr ships for `win-x64` and `win-arm64`, on both channels.
+From 5.0, Sanduhr ships for `win-x64` and `win-arm64`, on both channels.
 
 - **Store:** two packages in one submission, `Sanduhr-Store-x64-v<v>.msix` and
   `Sanduhr-Store-arm64-v<v>.msix`, from `scripts/build-msix.ps1 -Runtime`. The architecture is
@@ -406,7 +406,8 @@ Sanduhr ships for `win-x64` and `win-arm64`, on both channels.
   native build exists (`ArmBuildNotice`, `ArmBuildNoticeService`), and Settings, About, Updates
   keeps the line. The Store build never shows it.
 - **Never launch a locally built Sanduhr to test this.** `smoke-launch.ps1` and
-  `check-install-switch.ps1` are for CI runners; they use the real data folders.
+  `check-install-switch.ps1` use the real data folders, and both are enforced CI-only: each
+  refuses to run unless `GITHUB_ACTIONS` is `true`, before it starts or stops anything.
 
 ---
 

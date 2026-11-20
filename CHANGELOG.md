@@ -7,8 +7,8 @@
 - **Know when your agent is done.** A Windows notification, a card on the Desk, the glow or a taskbar flash when Claude Code, Codex or the Antigravity CLI finishes a long turn, and when Claude Code is waiting on you. It names the agent, the project and how long the turn ran ("Codex finished", "your-project, 4m 12s"), never anything that was said. By default the notification and the Desk card are on, the glow and the flash are off, and a finished turn only interrupts when it ran at least a minute and the agent's own window isn't in front; all of it is in the new Settings ▸ Notifications. Codex and Antigravity notify while their source is on in Sources. Antigravity's "finished" arrives about a minute and a half after its last step, because its log has no end marker. A finished glow takes the agent's color from Sources.
 - **The Claude Code hook is updated.** Update it in Settings ▸ Claude Code to get the notification and the Desk card: the new hook tells Sanduhr which folder and session an event came from, and when a turn started. It writes the folder and the session, never anything that was said, and it stops writing once 100 signals are waiting. In Settings the piece is now called "Claude Code hook". The older hook keeps lighting the glow as before.
 
-- **Native on Arm PCs.** Sanduhr now ships an arm64 build beside the x64 one, on the Microsoft Store and as a GitHub installer (`626Labs.Sanduhr-win-arm64-Setup.exe`) with its own update feed. The Store gives an Arm PC the arm64 package at its next update.
-- **An Arm PC on the x64 GitHub build is told once.** A notification, and a line in Settings → About → Updates, link to the native installer.
+- **Native on Arm PCs.** Sanduhr now ships an arm64 build beside the x64 one, on the Microsoft Store and as a GitHub installer (`626Labs.Sanduhr-win-arm64-Setup.exe`) with its own update feed. The Store serves each PC the package for its processor.
+- **An Arm PC on the x64 GitHub build is told once.** A notification, and a line in Settings → About → Updates, link to the release list, where the native installer is.
 
 ### Changed
 
