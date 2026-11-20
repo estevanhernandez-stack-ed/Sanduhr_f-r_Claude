@@ -35,13 +35,14 @@ struct SourcesSettingsTests {
     }
 
     private func makeModel(setup: SetupSettings? = SetupSettings(desktop: true, usage: ["claude": true]),
-                           deskOn: Bool = true) -> SourcesSettingsModel {
+                           deskOn: Bool = true, vaultRoots: Set<AgentSource> = []) -> SourcesSettingsModel {
         if let setup { SetupStore.save(setup, to: setupStore) }
         deskStore.set(deskOn, forKey: DeskController.enabledKey)
         let service = SetupService(storage: .defaults(setup: setupStore, desk: deskStore), host: host)
         let setupStore = self.setupStore
         return SourcesSettingsModel(service: service, store: appStore,
-                                    loadSetup: { SetupStore.load(from: setupStore) }, home: home, environment: [:])
+                                    loadSetup: { SetupStore.load(from: setupStore) }, home: home, environment: [:],
+                                    hasVaultRoot: { vaultRoots.contains($0) })
     }
 
     private func makeDir(_ parts: String...) throws {
@@ -300,5 +301,54 @@ struct SourcesSettingsTests {
         #expect(VaultAgentStop.isStopped(.antigravity, in: appStore))   // off keeps it too
         model.setOn(.antigravity, true)
         #expect(!VaultAgentStop.isStopped(.antigravity, in: appStore))
+    }
+
+    // MARK: Let Claude read an agent's project totals (item 13)
+
+    @Test func theConsentSwitchWordsAreTheWindowsOnes() {
+        #expect(SourcesCopy.mcpAgentSwitch(.codex) == "Let Claude read Codex's project totals")
+        #expect(SourcesCopy.mcpAgentSwitch(.antigravity) == "Let Claude read Antigravity's project totals")
+    }
+
+    @Test func theConsentSwitchIsHiddenUntilTheSourceIsOnOrHasARecord() {
+        let model = makeModel()
+        #expect(row(model, .claude).mcpAgent == nil)
+        #expect(row(model, .codex).mcpAgent == nil)
+        #expect(row(model, .antigravity).mcpAgent == nil)
+        // Codex on: its switch shows, off by default.
+        let codexOn = makeModel(setup: SetupSettings(desktop: true, usage: ["claude": true, "codex": true]))
+        #expect(row(codexOn, .codex).mcpAgent == MCPAgentSwitch(isOn: false, label: "Let Claude read Codex's project totals"))
+        #expect(row(codexOn, .antigravity).mcpAgent == nil)
+        // A source switched off with a Vault record still shows its switch.
+        let record = makeModel(vaultRoots: [.antigravity])
+        #expect(!row(record, .antigravity).isOn)
+        #expect(row(record, .antigravity).mcpAgent?.isOn == false)
+        #expect(row(record, .codex).mcpAgent == nil)
+    }
+
+    @Test func togglingTheConsentWritesItsKeyAndAsksForAResync() {
+        let model = makeModel(vaultRoots: [.codex, .antigravity])
+        var resynced = 0
+        model.onConsentChanged = { resynced += 1 }
+        #expect(appStore.object(forKey: "mcp.agents.codex") == nil)   // opening the page wrote nothing
+        model.setMCPAgent(.codex, true)
+        #expect(appStore.object(forKey: "mcp.agents.codex") as? Bool == true)
+        #expect(appStore.object(forKey: "mcp.agents.antigravity") == nil)
+        #expect(resynced == 1)
+        #expect(row(model, .codex).mcpAgent?.isOn == true)
+        #expect(MCPAgentConsent.load(from: appStore) == MCPAgentConsent.off.setting(.codex, true))
+        model.setMCPAgent(.codex, false)
+        #expect(appStore.object(forKey: "mcp.agents.codex") as? Bool == false)
+        #expect(resynced == 2)
+        #expect(MCPAgentConsent.load(from: appStore) == .off)
+    }
+
+    @Test func claudeHasNoConsentSwitchToToggle() {
+        let model = makeModel()
+        var resynced = 0
+        model.onConsentChanged = { resynced += 1 }
+        model.setMCPAgent(.claude, true)
+        #expect(resynced == 0)
+        #expect(appStore.values.isEmpty)
     }
 }

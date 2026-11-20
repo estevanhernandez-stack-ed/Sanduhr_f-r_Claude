@@ -14,9 +14,13 @@ struct SourcesSettingsView: View {
         // Applies a change exactly as Set up Sanduhr's Continue does (the same service and host).
         let host = AppSetupHost(usage: vm, confirm: { _ in false })
         let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
-        let model = SourcesSettingsModel(service: service)
+        let model = SourcesSettingsModel(
+            service: service,
+            hasVaultRoot: { VaultService.standard.reader.agentRoots().contains($0) })
         model.onApplied = { (NSApp.delegate as? AppDelegate)?.afterSetup($0) }
         model.onChanged = { NotificationCenter.default.post(name: .sanduhrSourcesDidChange, object: nil) }
+        // Claude's consent to an agent's totals lives in mcp-access.json: rewrite it now.
+        model.onConsentChanged = { [weak vm] in vm?.reloadAccounts() }
         _model = State(initialValue: model)
     }
 
@@ -62,6 +66,7 @@ private struct SourceRowView: View {
                 .disabled(!row.canToggle)
                 .accessibilityLabel(SourcesCopy.trackName(row.source))
             Lines(row: row, t: t)
+            if let mcp = row.mcpAgent { ConsentSwitch(mcp: mcp, row: row, model: model) }
             if row.source.hasLimits { Controls(row: row, model: model, t: t) }
             else { ColorControls(row: row, model: model, t: t).padding(.leading, 20) }
             if let refused = model.colorMessage[row.source] {
@@ -89,6 +94,20 @@ private struct SourceRowView: View {
                 .font(.system(size: size))
                 .foregroundStyle(t.textDim)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// "Let Claude read Codex's project totals", off until switched on.
+    private struct ConsentSwitch: View {
+        let mcp: MCPAgentSwitch
+        let row: SourceRow
+        let model: SourcesSettingsModel
+
+        var body: some View {
+            Toggle(mcp.label, isOn: Binding(get: { mcp.isOn }, set: { model.setMCPAgent(row.source, $0) }))
+                .toggleStyle(.checkbox)
+                .font(.system(size: 12))
+                .padding(.leading, 20)
         }
     }
 

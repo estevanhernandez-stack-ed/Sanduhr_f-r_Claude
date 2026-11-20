@@ -499,7 +499,12 @@ TOOLS = [
             "are a proxy (input+output, cache excluded) and are NOT convertible to quota "
             "percentages; use get_usage for headroom. Scoped to the accounts the user shares "
             "activity for in Sanduhr; every response names the accounts it covered. Project "
-            "names follow each account's choice: Hidden returns a short code per project."),
+            "names follow each account's choice: Hidden returns a short code per project. "
+            "When the user has also switched on 'Let Claude read Codex's (or Antigravity's) "
+            "project totals' in Sanduhr, an `agents` list carries that agent's total and "
+            "projects over whole local days from `agents_from` (read from Sanduhr's record, "
+            "so as fresh as its last ingest); an agent without that consent is never read "
+            "and `agents` is absent."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -1094,6 +1099,10 @@ def no_data(reason, remedy):
 REF_RE = re.compile(r"^[0-9a-f]{8}$")
 VAULT_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 HISTORY_RE = re.compile(r"^history\.[^/\\\x00]+\.json$")
+# The agents whose Vault roots (`vault/<name>`) Claude may read when the access file's `agents` object
+# switches them on (item 13). These fixed names are the only Vault root names that are not a 16-digit
+# hex vault id; nothing else may bypass VAULT_ID_RE.
+AGENT_ROOTS = ("codex", "antigravity")
 
 
 class Account:
@@ -1164,6 +1173,24 @@ def read_access(paths):
         seen.add(ref)
         out.append(Account(ref, row.get("active") is True, share, hist, names, vault_id, folder))
     return "ok", out
+
+
+def read_agents(paths):
+    """The agents the access file consents to, in AGENT_ROOTS order. A file without `agents`, an
+    unreadable one, a newer schema, and any value that is not exactly true all read as off; names
+    outside AGENT_ROOTS are never roots."""
+    try:
+        with open(paths.access, encoding="utf-8") as f:
+            doc = json.loads(f.read())
+    except (OSError, UnicodeDecodeError, ValueError):
+        return []
+    if not isinstance(doc, dict) or doc.get("schema_version") != ACCESS_SCHEMA_VERSION \
+            or isinstance(doc.get("schema_version"), bool):
+        return []
+    agents = doc.get("agents")
+    if not isinstance(agents, dict):
+        return []
+    return [name for name in AGENT_ROOTS if agents.get(name) is True]
 
 
 def not_shared(status):
@@ -1500,6 +1527,9 @@ def project_name_of(key):
 def read_vault_window(paths, vault_ids, first, last):
     by_day, by_in, by_out, by_project = {}, {}, {}, {}
     for vid in vault_ids:
+        # A vault id is 16 hex digits; the agents' fixed root names are the one allowlisted exception.
+        if not (VAULT_ID_RE.match(vid) or vid in AGENT_ROOTS):
+            continue
         for month in months_between(first, last):
             doc = read_json(os.path.join(paths.vault, vid, "rollups-%s.json" % month))
             days = doc.get("days") if isinstance(doc, dict) else None
@@ -1674,10 +1704,13 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
     access, accounts = read_access(paths)
-    if access != "ok" or not accounts:
-        return not_shared(access if access != "ok" else "none")
+    if access != "ok":
+        return not_shared(access)
+    consented = read_agents(paths)
+    if not accounts and not consented:
+        return not_shared("none")
     scanned = activity_accounts(accounts)
-    if not scanned:
+    if not scanned and not consented:
         return no_data("disabled", REMEDY_NO_ACTIVITY)
     since = now - timedelta(days=window_days)
     files = [0]
@@ -1697,7 +1730,7 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
             "total_tokens": total,
             "projects": [{"name": n, "tokens": t} for n, t in sorted(by_project.items(), key=lambda p: -p[1])],
         })
-    return {
+    result = {
         "status": "ok",
         "reason": None,
         "remedy": None,
@@ -1706,9 +1739,32 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
         "full_paths": bool(full_paths),
         "roots_scanned": [a.ref for a in scanned],
         "roots": roots,
-        "files_scanned": files[0],
-        "caveat": BURN_CAVEAT,
     }
+    if consented:
+        result.update(build_agent_totals(paths, consented, window_days, now))
+    result["files_scanned"] = files[0]
+    result["caveat"] = BURN_CAVEAT + (AGENT_CAVEAT if consented else "")
+    return result
+
+
+def build_agent_totals(paths, consented, window_days, now):
+    """The `agents` list for get_local_burn_by_project: each consented agent's project totals from
+    its Vault rollups over whole local days (today and the window_days - 1 before it, the span
+    Windows reads), largest project first. Only called with consented names."""
+    today = local_date(now)
+    first = today - timedelta(days=window_days - 1)
+    agents = []
+    for name in consented:
+        _, _, _, by_project = read_vault_window(paths, [name], first, today)
+        agents.append({
+            "agent": name,
+            "total_tokens": sum(by_project.values()),
+            "projects": [{"name": n, "tokens": t} for n, t in sorted(by_project.items(), key=lambda p: (-p[1], p[0]))],
+        })
+    return {"agents_scanned": list(consented), "agents_from": first.isoformat(), "agents": agents}
+
+
+AGENT_CAVEAT = " Agent totals come from the Vault and are as fresh as the widget's last ingest."
 
 
 def build_model_usage(window_days=7, now=None, paths=None):

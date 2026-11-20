@@ -25,6 +25,52 @@ struct MCPAccessEntry: Equatable, Sendable {
     let liveFolder: String?
 }
 
+/// Which agents' project totals Claude may read (agent sources item 13): a switch each, off by default,
+/// in the app defaults under `mcp.agents.<id>`. Claude Code is consented per folder, so it has no key
+/// here. Written to `mcp-access.json` as the top-level `agents` object, always, so a server reading a
+/// file with both false and a file from before this release (no `agents`) both read nothing.
+struct MCPAgentConsent: Equatable, Sendable {
+    var codex = false
+    var antigravity = false
+
+    static let off = MCPAgentConsent()
+
+    static func key(_ source: AgentSource) -> String { "mcp.agents.\(source.rawValue)" }
+
+    func isOn(_ source: AgentSource) -> Bool {
+        switch source {
+        case .codex: codex
+        case .antigravity: antigravity
+        case .claude: false
+        }
+    }
+
+    /// With `source`'s switch set; Claude has none, so it changes nothing.
+    func setting(_ source: AgentSource, _ on: Bool) -> MCPAgentConsent {
+        var copy = self
+        switch source {
+        case .codex: copy.codex = on
+        case .antigravity: copy.antigravity = on
+        case .claude: break
+        }
+        return copy
+    }
+
+    /// Entry by entry; anything that is not a stored Bool reads as off.
+    static func load(from store: DefaultsStore = UserDefaults.standard) -> MCPAgentConsent {
+        func bool(_ source: AgentSource) -> Bool {
+            guard let n = store.object(forKey: key(source)) as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return false }
+            return n.boolValue
+        }
+        return MCPAgentConsent(codex: bool(.codex), antigravity: bool(.antigravity))
+    }
+
+    func save(to store: DefaultsStore = UserDefaults.standard) {
+        store.set(codex, forKey: Self.key(.codex))
+        store.set(antigravity, forKey: Self.key(.antigravity))
+    }
+}
+
 /// `~/Library/Application Support/Sanduhr/mcp-access.json` (item 47): how the MCP server learns
 /// each account's Share with your agents choice without reading the app's defaults, the Keychain or
 /// any label. The app rewrites it whenever choices, links, accounts or the active account
@@ -33,11 +79,13 @@ struct MCPAccessEntry: Equatable, Sendable {
 ///     { "schema_version": 1,
 ///       "accounts": [ { "account_ref": "1a2b3c4d", "active": true, "share": "activity",
 ///                       "history_file": "history.<label>.json", "names": "hidden",
-///                       "vault_id": "0123456789abcdef", "live_folder": "/Users/x/.claude" } ] }
+///                       "vault_id": "0123456789abcdef", "live_folder": "/Users/x/.claude" } ],
+///       "agents": { "codex": false, "antigravity": false } }
 ///
 /// Keys appear only when allowed: `history_file` with any sharing, `names` and `live_folder`
 /// with activity and a linked folder that is read (Live only or Keep a record), `vault_id`
-/// with activity and Keep a record. Accounts with sharing off are left out entirely.
+/// with activity and Keep a record. Accounts with sharing off are left out entirely. `agents` is
+/// always written (item 13): which agents' project totals the server may read from the Vault.
 enum MCPAccess {
     static let schemaVersion = 1
     static let fileName = "mcp-access.json"
@@ -68,7 +116,7 @@ enum MCPAccess {
 
     /// The file's bytes: sorted keys and no escaped slashes, so the same choices always give
     /// the same bytes and an unchanged file is never rewritten.
-    static func encode(_ entries: [MCPAccessEntry]) -> Data {
+    static func encode(_ entries: [MCPAccessEntry], agents: MCPAgentConsent = .off) -> Data {
         var accounts: [[String: Any]] = []
         for e in entries {
             var o: [String: Any] = [
@@ -82,7 +130,11 @@ enum MCPAccess {
             if let folder = e.liveFolder { o["live_folder"] = folder }
             accounts.append(o)
         }
-        let root: [String: Any] = ["schema_version": schemaVersion, "accounts": accounts]
+        let root: [String: Any] = [
+            "schema_version": schemaVersion,
+            "accounts": accounts,
+            "agents": ["codex": agents.codex, "antigravity": agents.antigravity],
+        ]
         let data = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys, .withoutEscapingSlashes])
         return data ?? Data()
     }
@@ -111,7 +163,7 @@ enum MCPAccess {
     /// Builds and writes the file for the current accounts.
     @discardableResult
     static func sync(labels: [String], active: String?, choices: [String: AccountDataChoices],
-                     to url: URL = standardURL) -> WriteOutcome {
-        write(encode(entries(labels: labels, active: active, choices: choices)), to: url)
+                     agents: MCPAgentConsent = .off, to url: URL = standardURL) -> WriteOutcome {
+        write(encode(entries(labels: labels, active: active, choices: choices), agents: agents), to: url)
     }
 }

@@ -786,7 +786,8 @@ final class UsageViewModel {
         }
         // What the MCP server may read follows every change to choices, links, the account list
         // and the active account (item 47). Rewritten only when its bytes change.
-        MCPAccess.sync(labels: labels, active: active, choices: data)
+        MCPAccess.sync(labels: labels, active: active, choices: data,
+                       agents: MCPAgentConsent.load(from: accounts.defaults))
         syncSeats()
     }
 

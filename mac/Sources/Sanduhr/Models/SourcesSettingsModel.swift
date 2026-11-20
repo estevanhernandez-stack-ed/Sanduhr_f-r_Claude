@@ -24,6 +24,9 @@ enum SourcesCopy {
     /// Nominative use, in the wording of Windows' `AntigravityNotice`; shown where Antigravity is named.
     static let antigravityTrademark = "Antigravity and Gemini are trademarks of Google LLC. Sanduhr is not affiliated with or endorsed by Google."
 
+    /// The consent switch under an agent's row (Windows' wording).
+    static func mcpAgentSwitch(_ source: AgentSource) -> String { "Let Claude read \(source.displayName)'s project totals" }
+
     static func trackName(_ source: AgentSource) -> String { "Track \(source.displayName)" }
     static func primaryName(_ source: AgentSource) -> String { "\(source.displayName) primary" }
     static func colorName(_ source: AgentSource) -> String { "\(source.displayName) color" }
@@ -55,6 +58,12 @@ enum SourcesColor {
     }
 }
 
+/// The "Let Claude read ...'s project totals" switch under an agent's row.
+struct MCPAgentSwitch: Equatable {
+    let isOn: Bool
+    let label: String
+}
+
 /// One row of the Sources group.
 struct SourceRow: Equatable, Identifiable {
     let source: AgentSource
@@ -72,6 +81,9 @@ struct SourceRow: Equatable, Identifiable {
     /// "Nothing found yet." while the source's folder is absent or empty.
     let nothingFound: String?
     let trademark: String?
+    /// Claude's consent to read this agent's project totals; nil for Claude Code (consented per folder)
+    /// and while the agent is neither on nor holding a Vault record.
+    let mcpAgent: MCPAgentSwitch?
 }
 
 /// Settings, Usage, Sources (agent sources design, section 2). Claude's and Codex's switches are the
@@ -91,22 +103,27 @@ final class SourcesSettingsModel {
     @ObservationIgnored var onChanged: () -> Void = {}
     /// A setup change was applied: the app starts or stops what follows (`AppDelegate.afterSetup`).
     @ObservationIgnored var onApplied: (SetupResult) -> Void = { _ in }
+    /// An agent's consent switch changed: the app rewrites `mcp-access.json`.
+    @ObservationIgnored var onConsentChanged: () -> Void = {}
 
     @ObservationIgnored private let service: SetupService
     @ObservationIgnored private let store: DefaultsStore
     @ObservationIgnored private let loadSetup: () -> SetupSettings?
     @ObservationIgnored private let home: URL
     @ObservationIgnored private let environment: [String: String]
+    @ObservationIgnored private let hasVaultRoot: (AgentSource) -> Bool
 
     init(service: SetupService, store: DefaultsStore = UserDefaults.standard,
          loadSetup: @escaping () -> SetupSettings? = { SetupStore.load() },
          home: URL = FileManager.default.homeDirectoryForCurrentUser,
-         environment: [String: String] = ProcessInfo.processInfo.environment) {
+         environment: [String: String] = ProcessInfo.processInfo.environment,
+         hasVaultRoot: @escaping (AgentSource) -> Bool = { _ in false }) {
         self.service = service
         self.store = store
         self.loadSetup = loadSetup
         self.home = home
         self.environment = environment
+        self.hasVaultRoot = hasVaultRoot
         reload()
     }
 
@@ -122,6 +139,7 @@ final class SourcesSettingsModel {
             case .antigravity: SourcesProbe.antigravityFound(home: home)
             }
         }
+        let consent = MCPAgentConsent.load(from: store)
         rows = AgentSource.allCases.map { source in
             let on = settings.isOn(source, setup: setup)
             let color = settings.color(of: source)
@@ -131,7 +149,9 @@ final class SourcesSettingsModel {
                 isPrimary: source.hasLimits && source == primary,
                 canBePrimary: source.hasLimits && on,
                 caption: Self.caption(source), nothingFound: found(source) ? nil : SourcesCopy.nothingFound,
-                trademark: Self.trademark(source))
+                trademark: Self.trademark(source),
+                mcpAgent: source == .claude || !(on || hasVaultRoot(source)) ? nil
+                    : MCPAgentSwitch(isOn: consent.isOn(source), label: SourcesCopy.mcpAgentSwitch(source)))
         }
     }
 
@@ -193,6 +213,16 @@ final class SourcesSettingsModel {
         if unchanged { return false }
         onApplied(result)
         return true
+    }
+
+    // MARK: Claude's read of an agent's totals (item 13)
+
+    /// Saves the switch and asks the app to rewrite `mcp-access.json`. Claude Code has none.
+    func setMCPAgent(_ source: AgentSource, _ on: Bool) {
+        guard source != .claude else { return }
+        store.set(on, forKey: MCPAgentConsent.key(source))
+        reload()
+        onConsentChanged()
     }
 
     // MARK: Primary and color
