@@ -131,11 +131,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codexUsage.onUpdate = { [weak self] in
             self?.codexRecorder.record($0)
             self?.fitPanelToContent()
+            self?.renderStatusItem()   // the menu bar follows Primary, so a Codex reading can change it
         }
         codexUsage.onStop = { [weak self] in
             let on = AgentSourceSettings.load().isOn(.codex, setup: SetupStore.load())
             self?.codexRecorder.stopped(codexOn: on)
             self?.fitPanelToContent()
+            self?.renderStatusItem()
         }
         // A section's chevron changes the widget's height.
         widgetSources.onChange = { [weak self] in self?.fitPanelToContent() }
@@ -144,6 +146,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 self?.syncCodexSource()
                 self?.fitPanelToContent()
+                self?.renderStatusItem()
+            }
+        }
+        // Settings, Usage, Sources: a color, Primary or Antigravity's switch changed.
+        NotificationCenter.default.addObserver(forName: .sanduhrSourcesDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.syncCodexSource()
+                self?.fitPanelToContent()
+                self?.renderStatusItem()
             }
         }
 
@@ -536,10 +547,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep,
-                                          usageOn: viewModel.usageOn)
+        let setup = SetupStore.load()
+        let sources = AgentSourceSettings.load()
+        let display = MenuBarText.display(
+            primary: sources.primary(setup: setup),
+            claude: viewModel.usage, claudeOn: viewModel.usageOn,
+            codex: codexUsage.codexUsage, codexOn: sources.isOn(.codex, setup: setup),
+            codexFresh: codexUsage.freshTiers, mode: .saved(), step: menuBarStep)
+        // Only with another source further out, or a stale Codex primary; a Claude-only Mac has none.
+        button.toolTip = display.tooltip
 
-        if let reading {
+        if let reading = display.reading {
             let look = MenuBarItemLook(reading)
             button.attributedTitle = NSAttributedString(
                 string: look.title,
