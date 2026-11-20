@@ -21,6 +21,13 @@ final class SetupViewModel {
         }
     }
 
+    /// Codex is ticked. It never asks to sign in: it is read from its own files on this Mac.
+    var codexUsage: Bool { didSet { if codexUsage != oldValue { refresh() } } }
+    /// There is a Codex folder to read. Without one the choice is greyed, unless it is already ticked (so it can be cleared).
+    let codexInstalled: Bool
+    var codexEnabled: Bool { codexInstalled || codexUsage }
+    var codexNotInstalledLine: String? { codexInstalled ? nil : SetupCopy.codexNotInstalled }
+
     /// What unticking does, said before Continue applies it. Empty on a first run: nothing is on yet.
     private(set) var changeLines: [String] = []
     /// Why Continue is off, or nil.
@@ -47,20 +54,24 @@ final class SetupViewModel {
 
     /// `hasAccount`: an account added while the screen was up (a first run) means usage is wanted,
     /// so it is ticked when the window opens, and again at Continue if that tick was never touched.
-    init(service: SetupService, firstRun: Bool, hasAccount: @escaping () -> Bool = { false }) {
+    /// `codexInstalled`: whether a Codex folder exists (`CodexInstall.isInstalled`).
+    init(service: SetupService, firstRun: Bool, hasAccount: @escaping () -> Bool = { false },
+         codexInstalled: Bool = false) {
         self.service = service
         self.hasAccount = hasAccount
         self.firstRun = firstRun
+        self.codexInstalled = codexInstalled
         let now = firstRun ? SetupChoices.firstRun : service.current()
         desktop = now.desktop
         drawers = now.drawers
         claudeUsage = now.claudeUsage || (firstRun && hasAccount())
+        codexUsage = now.codexUsage
         refresh()
     }
 
     var dismissLabel: String { firstRun ? SetupCopy.notNow : SetupCopy.cancel }
     var canContinue: Bool { blocked == nil && !said }
-    var choices: SetupChoices { SetupChoices(desktop: desktop, drawers: drawers, claudeUsage: claudeUsage) }
+    var choices: SetupChoices { SetupChoices(desktop: desktop, drawers: drawers, claudeUsage: claudeUsage, codexUsage: codexUsage) }
 
     /// The trademark line shows whenever Claude is named on the screen: usage ticked, or a change
     /// line that says Claude (the add-ons line names Claude Code with usage unticked).
