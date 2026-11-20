@@ -19,12 +19,12 @@ internal sealed class ArmBuildNoticeService
     private readonly string _url;
     private readonly Func<bool> _alreadyShown;
     private readonly Action _markShown;
-    private readonly Action _showToast;
+    private readonly Func<bool> _showToast;
     private readonly Action<string> _openLink;
     private readonly Action<string>? _log;
 
     public ArmBuildNoticeService(bool applies, string url, Func<bool> alreadyShown, Action markShown,
-        Action? showToast = null, Action<string>? openLink = null, Action<string>? log = null)
+        Func<bool>? showToast = null, Action<string>? openLink = null, Action<string>? log = null)
     {
         _applies = applies;
         _url = url;
@@ -76,11 +76,18 @@ internal sealed class ArmBuildNoticeService
         if (!ArmBuildNotice.ToastDue(_applies, shown))
             return false;
         _log?.Invoke(ArmBuildNotice.LogDue);
-        try { _showToast(); }
+        bool taken;
+        try { taken = _showToast(); }
         catch (Exception e)
         {
             // Not marked: the next launch tries again.
             Log($"toast ({e.GetType().Name})");
+            return false;
+        }
+        if (!taken)
+        {
+            // Windows dropped it without throwing (notifications off): not marked, the next launch tries again.
+            Log("toast (refused)");
             return false;
         }
         try { _markShown(); }
@@ -88,9 +95,22 @@ internal sealed class ArmBuildNoticeService
         return true;
     }
 
-    private static void ShowToast() => Toasts.Show(ArmBuildNotice.Title, ArmBuildNotice.Body, more: b => b
-        .AddButton(new ToastButton().SetContent(ArmBuildNotice.GetText).AddArgument("action", ArmBuildNotice.GetAction))
-        .AddButton(new ToastButtonDismiss(ArmBuildNotice.LaterText)));
+    /// <summary>True when Windows took the notification, false when the user's notification settings refuse it.</summary>
+    private static bool ShowToast()
+    {
+        if (NotificationsRefused())
+            return false;
+        Toasts.Show(ArmBuildNotice.Title, ArmBuildNotice.Body, more: b => b
+            .AddButton(new ToastButton().SetContent(ArmBuildNotice.GetText).AddArgument("action", ArmBuildNotice.GetAction))
+            .AddButton(new ToastButtonDismiss(ArmBuildNotice.LaterText)));
+        return true;
+    }
+
+    private static bool NotificationsRefused()
+    {
+        try { return ToastNotificationManagerCompat.CreateToastNotifier().Setting != Windows.UI.Notifications.NotificationSetting.Enabled; }
+        catch (Exception) { return false; }   // an unreadable setting is unknown, not refused: still try to show
+    }
 
     private static void OpenInBrowser(string url)
     {

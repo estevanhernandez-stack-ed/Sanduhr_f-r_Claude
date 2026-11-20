@@ -16,6 +16,7 @@ public sealed class ArmBuildNoticeServiceTests
         public int Toasts;
         public int Marked;
         public bool ToastThrows;
+        public bool ToastDropped;
         public bool MarkThrows;
         public List<string> Opened { get; } = [];
         public List<string> Log { get; } = [];
@@ -32,6 +33,7 @@ public sealed class ArmBuildNoticeServiceTests
             {
                 if (ToastThrows) throw new InvalidOperationException("no notifications");
                 Toasts++;
+                return !ToastDropped;
             },
             openLink: Opened.Add,
             log: Log.Add);
@@ -89,6 +91,23 @@ public sealed class ArmBuildNoticeServiceTests
         rig.ToastThrows = false;
         Assert.True(service.ShowIfDue());
         Assert.Equal(1, rig.Toasts);
+    }
+
+    [Fact]
+    public void A_notification_Windows_drops_without_throwing_is_not_counted_as_shown()
+    {
+        var rig = new Rig { ToastDropped = true };
+        var service = rig.Make(applies: true);
+
+        Assert.False(service.ShowIfDue());
+
+        Assert.Equal(0, rig.Marked);
+        Assert.False(rig.Shown);
+        Assert.Contains(ArmBuildNotice.LogDue, rig.Log);
+        Assert.Contains(rig.Log, l => l.Contains("toast (refused)"));
+        // The next launch tries again.
+        Assert.False(service.ShowIfDue());
+        Assert.Equal(2, rig.Toasts);
     }
 
     [Fact]
