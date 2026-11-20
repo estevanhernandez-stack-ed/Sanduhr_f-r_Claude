@@ -20,6 +20,7 @@ public sealed partial class AboutUpdatesViewModel : ObservableObject
 {
     private readonly SettingsStore _store;
     private readonly Func<Task<UpdateProbeResult>>? _checkNow;
+    private readonly Action<string>? _openLink;
     private bool _loading;
 
     /// <summary>"Check for updates once a day" (settings.json "update_check").</summary>
@@ -33,12 +34,24 @@ public sealed partial class AboutUpdatesViewModel : ObservableObject
     public bool IsGitHubBuild => !IsStoreBuild;
     public string Caption => SettingsNames.UpdatesCaption;
 
+    /// <summary>The release list to get the Arm build from; null unless this copy is an x64 build on an Arm PC (5.0 spec 7).</summary>
+    public string? ArmBuildUrl { get; }
+    /// <summary>The standing line and its link show for as long as the notice applies. Never on the Store build.</summary>
+    public bool ArmBuildAvailable => ArmBuildUrl is not null && IsGitHubBuild;
+    public string ArmBuildLine => ArmBuildNotice.AboutLine;
+    public string ArmBuildGet => ArmBuildNotice.GetText;
+
     /// <param name="checkNow">App's <c>UpdateChecker.CheckNowAsync</c>; null in tests and the harness, which dims Check now.</param>
-    public AboutUpdatesViewModel(SettingsStore store, bool isStoreBuild, Func<Task<UpdateProbeResult>>? checkNow)
+    /// <param name="armBuildUrl">Where to get the Arm build, or null where the Arm build notice does not apply.</param>
+    /// <param name="openLink">Opens an https link in the browser.</param>
+    public AboutUpdatesViewModel(SettingsStore store, bool isStoreBuild, Func<Task<UpdateProbeResult>>? checkNow,
+        string? armBuildUrl = null, Action<string>? openLink = null)
     {
         _store = store;
         IsStoreBuild = isStoreBuild;
         _checkNow = checkNow;
+        ArmBuildUrl = armBuildUrl;
+        _openLink = openLink;
         Reload();
     }
 
@@ -70,6 +83,13 @@ public sealed partial class AboutUpdatesViewModel : ObservableObject
             UpdateProbeStatus.NotInstalled => SettingsNames.UpdateNotInstalled,
             _ => SettingsNames.UpdateFailed,
         });
+    }
+
+    [RelayCommand]
+    private void GetArmBuild()
+    {
+        if (ArmBuildUrl is { } url)
+            _openLink?.Invoke(url);
     }
 
     /// <summary>A new message, announced: the flag goes false first, so the live region raises again.</summary>

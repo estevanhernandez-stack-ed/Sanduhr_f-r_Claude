@@ -222,7 +222,7 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
 
     public SettingsViewModel(WidgetViewModel widget, Func<Task> addAccountAsync, Func<string, Task> updateSignInAsync,
         GlobalHotKeyService? hotKeys = null, Action? showWhatsNew = null, Action? showTour = null,
-        Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null)
+        Func<Task<UpdateProbeResult>>? checkForUpdatesNow = null, bool? isStoreBuild = null, Func<string?>? armBuildUrl = null)
     {
         _widget = widget;
         ShowWhatsNewCommand = new RelayCommand(() => showWhatsNew?.Invoke());
@@ -230,7 +230,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         OpenSetupCommand = new RelayCommand(() => SetupRequested?.Invoke());
         AboutVersion = new AboutVersionViewModel(new SettingsStore(new Paths()));
         // About, Updates (slice 6): App's checker reads "update_check" from this same file; the Store build (StoreUpdateService's rule) shows its line instead.
-        AboutUpdates = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild ?? Sanduhr.Core.Startup.IsPackaged(), checkForUpdatesNow);
+        // The Arm build line (5.0 spec 7) shows only for an x64 build on an Arm PC; tests say which the machine is.
+        AboutUpdates = new AboutUpdatesViewModel(new SettingsStore(new Paths()), isStoreBuild ?? Sanduhr.Core.Startup.IsPackaged(), checkForUpdatesNow,
+            (armBuildUrl ?? ArmBuildNoticeService.UrlIfApplies)(), OpenLink);
         Accounts = new AccountsViewModel(widget, addAccountAsync, updateSignInAsync);
         Themes = new ThemesViewModel(widget);
         History = new HistoryTabViewModel(widget);

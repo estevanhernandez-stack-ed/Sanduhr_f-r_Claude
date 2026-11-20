@@ -4,15 +4,28 @@
 # Without a code-sign cert, SmartScreen warns ("More info -> Run anyway") on first install --
 # that's the trade for the free GitHub channel. The Store MSIX (build-msix.ps1) is the signed path.
 #
-# Output (under windows-dotnet/dist/release/):
-#   - 626Labs.Sanduhr-win-Setup.exe        installer users download
-#   - 626Labs.Sanduhr-<v>-full.nupkg       full package (auto-updater consumes this)
-#   - 626Labs.Sanduhr-<v>-delta.nupkg      delta vs prior release (release #2+)
-#   - 626Labs.Sanduhr-win-Portable.zip     no-install portable flavor
-#   - releases.win.json                    manifest the in-app UpdateChecker pings
+# One run builds one architecture; a release runs it twice, x64 first, into the same folder.
+#
+# Output (under windows-dotnet/dist/release/), x64:
+#   - 626Labs.Sanduhr-win-Setup.exe              installer users download
+#   - 626Labs.Sanduhr-<v>-full.nupkg             full package (auto-updater consumes this)
+#   - 626Labs.Sanduhr-<v>-delta.nupkg            delta vs prior release (release #2+)
+#   - 626Labs.Sanduhr-win-Portable.zip           no-install portable flavor
+#   - releases.win.json                          the feed every x64 install reads
+# and arm64, each name carrying its channel:
+#   - 626Labs.Sanduhr-win-arm64-Setup.exe
+#   - 626Labs.Sanduhr-<v>-win-arm64-full.nupkg
+#   - 626Labs.Sanduhr-win-arm64-Portable.zip
+#   - releases.win-arm64.json                    the feed every arm64 install reads
+#
+# THE X64 PACK COMMAND MUST NOT CHANGE. x64 passes no channel, which leaves it on Velopack's default
+# ("win"). Every x64 install in the wild reads releases.win.json; packing x64 with any other channel
+# orphans all of them. arm64 packs with its own channel, win-arm64, and an install follows the channel
+# it was packaged with, so the app's UpdateChecker names none. ReleaseScriptPinsTests pins both.
 #
 # Run from repo root (Sanduhr/):
-#   pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 3.0.0.0
+#   pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0
+#   pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0 -Runtime win-arm64
 #
 # Requires:
 #   - .NET 10 SDK
@@ -30,15 +43,23 @@ param(
     [string]$Version,
 
     [string]$Configuration = 'Release',
+    [ValidateSet('win-x64', 'win-arm64')]
     [string]$Runtime = 'win-x64',
     [string]$ReleaseNotes,
     [switch]$SkipPublish,
     [switch]$SkipIco,
-    # CI: keep dist/release/ contents (prior nupkgs from `vpk download github`) so vpk can delta.
-    [switch]$NoClean
+    # Keep this architecture's files in dist/release/ (prior nupkgs from `vpk download github`) so vpk can delta.
+    # The other architecture's files are never touched either way.
+    [switch]$NoClean,
+    # Tests: where the packages land. Defaults to windows-dotnet/dist/release.
+    [string]$ReleaseDir,
+    # Tests: run the clean step alone and exit.
+    [switch]$CleanOnly
 )
 
 $ErrorActionPreference = 'Stop'
+# -CleanOnly is for tests. Without -ReleaseDir it would clean the real dist\release and exit.
+if ($CleanOnly -and -not $ReleaseDir) { throw '-CleanOnly needs -ReleaseDir (a test folder). Nothing was cleaned.' }
 
 # vpk --packVersion wants 3-part SemVer2; the assembly + tag use the 4-part .NET version. Strip
 # the 4th segment for vpk only.
@@ -46,8 +67,31 @@ $packVersion = ($Version -split '\.')[0..2] -join '.'
 
 $repoRoot   = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $appProject = Join-Path $repoRoot 'windows-dotnet\src\Sanduhr.App\Sanduhr.App.csproj'
-$publishDir = Join-Path $repoRoot 'windows-dotnet\dist\publish-velopack'
-$releaseDir = Join-Path $repoRoot 'windows-dotnet\dist\release'
+$arch = $Runtime -replace '^win-', ''
+# x64 keeps dist\publish-velopack; arm64 gets its own folder so one build cannot overwrite the other.
+if ($arch -eq 'x64') { $publishDir = Join-Path $repoRoot 'windows-dotnet\dist\publish-velopack' }
+else { $publishDir = Join-Path $repoRoot "windows-dotnet\dist\publish-velopack-$arch" }
+# Resolved against PowerShell's location, not the .NET current directory, which a relative path would otherwise use.
+if ($ReleaseDir) { $releaseDir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ReleaseDir) }
+else { $releaseDir = Join-Path $repoRoot 'windows-dotnet\dist\release' }
+
+# Both architectures pack into one folder, and each build must leave the other's files alone. A file belongs
+# to arm64 when its name contains 'win-arm64'; every other file belongs to x64.
+function Clear-ChannelFiles {
+    param([string]$Dir, [string]$ForRuntime)
+    if (-not (Test-Path -LiteralPath $Dir)) { return }
+    # Any file without 'win-arm64' in its name counts as x64, and subfolders are left alone (-File, no -Recurse).
+    foreach ($f in @(Get-ChildItem -LiteralPath $Dir -File)) {
+        $isArm = $f.Name -like '*win-arm64*'
+        if (($ForRuntime -eq 'win-arm64' -and $isArm) -or ($ForRuntime -ne 'win-arm64' -and -not $isArm)) {
+            Remove-Item -LiteralPath $f.FullName -Force
+        }
+    }
+}
+if ($CleanOnly) {
+    Clear-ChannelFiles -Dir $releaseDir -ForRuntime $Runtime
+    exit 0
+}
 $logosDir   = Join-Path $repoRoot 'windows-dotnet\src\Sanduhr.App\Package\Logos'
 $icoOutPath = Join-Path $logosDir 'AppIcon.ico'
 
@@ -111,8 +155,13 @@ if (-not (Test-Path (Join-Path $publishDir 'Sanduhr.exe'))) {
     throw "Publish output missing Sanduhr.exe at $publishDir. Re-run without -SkipPublish."
 }
 
+# Architecture gate: no file for the other processor, and the app and the server are this one's. It runs
+# with -SkipPublish too, so a stale folder of the wrong architecture cannot be packed.
+& (Join-Path $PSScriptRoot 'check-architecture.ps1') -Dir $publishDir -Runtime $Runtime
+if ($LASTEXITCODE -ne 0) { throw "Architecture gate failed for $publishDir." }
+
 # ----- 4. vpk pack ------------------------------------------------------------
-if (-not $NoClean -and (Test-Path $releaseDir)) { Remove-Item -Recurse -Force $releaseDir }
+if (-not $NoClean) { Clear-ChannelFiles -Dir $releaseDir -ForRuntime $Runtime }
 New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
 
 # packId MUST NOT be 'Sanduhr': Velopack installs to %LOCALAPPDATA%\{packId}, and
@@ -133,6 +182,8 @@ $vpkArgs = @(
     '--outputDir',   $releaseDir
     '--delta',       'BestSpeed'
 )
+# arm64 only. x64 names neither, on purpose: see the header.
+if ($Runtime -eq 'win-arm64') { $vpkArgs += @('--runtime', 'win-arm64', '--channel', 'win-arm64') }
 if ($ReleaseNotes -and (Test-Path $ReleaseNotes)) { $vpkArgs += @('--releaseNotes', (Resolve-Path $ReleaseNotes).Path) }
 
 Write-Host "[vpk] vpk $($vpkArgs -join ' ')" -ForegroundColor Cyan
@@ -146,5 +197,6 @@ Get-ChildItem $releaseDir -File | Sort-Object Name | ForEach-Object {
     Write-Host ("  {0,-46} {1,8} MB" -f $_.Name, [math]::Round($_.Length / 1MB, 1))
 }
 Write-Host ""
-Write-Host "Next: tag v$Version, draft a GitHub release, upload EVERY file from dist/release/." -ForegroundColor Yellow
-Write-Host "      (releases.win.json + *-full.nupkg are what the in-app auto-updater pings.)" -ForegroundColor Yellow
+if ($Runtime -eq 'win-arm64') { $feed = 'releases.win-arm64.json' } else { $feed = 'releases.win.json' }
+Write-Host "Next: build the other architecture into the same folder, then upload EVERY file from dist/release/." -ForegroundColor Yellow
+Write-Host "      ($feed + this architecture's *-full.nupkg are what its installs read to update.)" -ForegroundColor Yellow

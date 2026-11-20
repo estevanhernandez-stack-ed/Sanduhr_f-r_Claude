@@ -18,6 +18,9 @@ defaults:
 jobs:
   build-and-test:
     runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -36,3 +39,52 @@ jobs:
           name: dotnet-test-results
           path: windows-dotnet/**/TestResults/*.trx
           if-no-files-found: ignore
+      # What ships is the published app, so publish it and run it: the architecture gate, the MCP
+      # server cold, and the app itself. The same four steps run on Arm below.
+      - name: Restore for publish (win-x64)
+        run: dotnet restore src/Sanduhr.App/Sanduhr.App.csproj /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishReadyToRun=true
+      - name: Publish (win-x64)
+        run: dotnet publish src/Sanduhr.App/Sanduhr.App.csproj --no-restore -c Release -r win-x64 --self-contained true -o dist/publish /p:PublishReadyToRun=true /p:DebugType=None /p:DebugSymbols=false
+      - name: Architecture gate
+        run: ./scripts/check-architecture.ps1 -Dir dist/publish -Runtime win-x64
+      - name: MCP smoke
+        run: ./scripts/smoke-mcp.ps1 -Exe dist/publish/mcp/sanduhr-mcp.exe
+      - name: Launch check
+        run: ./scripts/smoke-launch.ps1 -Exe dist/publish/Sanduhr.exe
+
+  # 5.0 spec 7: nobody on the team owns Arm hardware, so this runner is where arm64 Sanduhr runs.
+  # The suites run natively (the Windows calls, winsqlite3, the uxtheme ordinals, the hook's
+  # PowerShell), then the arm64 app is published and started.
+  build-test-arm64:
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+      - name: Test
+        run: dotnet test --no-build --configuration Release --logger "trx;LogFileName=results.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results-arm64
+          path: windows-dotnet/**/TestResults/*.trx
+          if-no-files-found: ignore
+      - name: Restore for publish (win-arm64)
+        run: dotnet restore src/Sanduhr.App/Sanduhr.App.csproj /p:RuntimeIdentifier=win-arm64 /p:SelfContained=true /p:PublishReadyToRun=true
+      - name: Publish (win-arm64)
+        run: dotnet publish src/Sanduhr.App/Sanduhr.App.csproj --no-restore -c Release -r win-arm64 --self-contained true -o dist/publish-arm64 /p:PublishReadyToRun=true /p:DebugType=None /p:DebugSymbols=false
+      - name: Architecture gate
+        run: ./scripts/check-architecture.ps1 -Dir dist/publish-arm64 -Runtime win-arm64
+      - name: MCP smoke
+        run: ./scripts/smoke-mcp.ps1 -Exe dist/publish-arm64/mcp/sanduhr-mcp.exe
+      - name: Launch check
+        run: ./scripts/smoke-launch.ps1 -Exe dist/publish-arm64/Sanduhr.exe

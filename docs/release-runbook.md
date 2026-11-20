@@ -8,11 +8,13 @@
 > first submission; this doc is the loop you run every release.
 
 > **Two distribution channels per release, one version:**
-> 1. **Microsoft Store** — unsigned MSIX (`windows-dotnet/dist/Sanduhr-Store-v<v>.msix`), Partner
->    Center re-signs after upload. Reuses the existing listing under identity
+> 1. **Microsoft Store** — two unsigned MSIX packages (`windows-dotnet/dist/Sanduhr-Store-x64-v<v>.msix`
+>    and `Sanduhr-Store-arm64-v<v>.msix`), Partner Center re-signs after upload. Reuses the existing listing under identity
 >    `626LabsLLC.SanduhrfrClaude`.
-> 2. **GitHub Release** — Velopack `sanduhr-win-Setup.exe` + delta `.nupkg` + `releases.win.json`
->    (the in-app `UpdateChecker` auto-update channel).
+> 2. **GitHub Release** — Velopack installers for both architectures, `626Labs.Sanduhr-win-Setup.exe`
+>    (x64) and `626Labs.Sanduhr-win-arm64-Setup.exe`, with their full and delta `.nupkg` files and
+>    the two feeds, `releases.win.json` (x64) and `releases.win-arm64.json` (the in-app
+>    `UpdateChecker` auto-update channel).
 >
 > Both ship from the same tag. The .NET rebuild's first Store submission (**v3.0.0.0**) replaces
 > the Python build in the SAME listing — same Identity Name and Publisher CN, so it's an update,
@@ -98,12 +100,16 @@ One command. Self-contained (bundles the .NET 10 Desktop Runtime → larger MSIX
 fresh Win11 box without a separate runtime install).
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -Store -Version 3.0.0.0
+powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -Store -Runtime win-x64 -Version 5.0.0.0
+powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -Store -Runtime win-arm64 -Version 5.0.0.0
 ```
 
 - Runs the **logo gate** (fails fast on missing/stub tiles).
 - Publishes → stages publish output + version-patched manifest + logos → `makeappx pack`.
-- Output: `windows-dotnet/dist/Sanduhr-Store-v3.0.0.0.msix` (**unsigned** — Partner Center signs).
+- Output: `windows-dotnet/dist/Sanduhr-Store-x64-v5.0.0.0.msix` and
+  `windows-dotnet/dist/Sanduhr-Store-arm64-v5.0.0.0.msix` (**unsigned** — Partner Center signs).
+  Each run ends with the architecture gate (`check-architecture.ps1`): no file for the other
+  processor, and the app and the MCP server built for this one.
 - Leaves the committed manifest untouched (only the staged copy is version-patched).
 - Publishes the MCP server into the payload as `mcp\sanduhr-mcp.exe` (self-contained, trimmed,
   single-file; the App's `PublishMcpServer` target). **Run it cold before packing anything else:**
@@ -117,6 +123,13 @@ powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -
   what the linker cannot prove is used, so this run is the proof the shipped server works; a
   linker warning already fails the publish (`ILLinkTreatWarningsAsErrors` in `Sanduhr.Mcp.csproj`).
 
+  **The arm64 server cannot be run on an x64 PC.** `smoke-mcp.ps1` covers the x64 package here.
+  The arm64 package's server, and the arm64 app itself, are run by the Arm check workflow in
+  Phase 6, on the draft release, before anything is published.
+
+  The local arm64 package only proves the arm64 build works on this PC. It is not the one
+  submitted: Phase 7 submits the draft's own packages, the ones the Arm check ran.
+
 Optional local install test (sideload): build a self-signed flavor whose cert subject CN matches
 the manifest Publisher, import the cert into Trusted People, then `Add-AppxPackage`:
 
@@ -128,20 +141,49 @@ powershell -ExecutionPolicy Bypass -File windows-dotnet/scripts/build-msix.ps1 -
 
 ## Phase 4 — Build the Velopack release (GitHub channel)
 
+First fetch the previous release's full packages and feeds into `dist/release/`, so `vpk` can
+compute a delta. `--clobber` overwrites what the last release left there: older files in the folder
+are harmless, but the feeds and full packages must be the previous release's.
+
 ```powershell
-pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 3.0.0.0
+gh release download v<prev> --pattern "*-full.nupkg" --pattern "releases.win.json" --dir windows-dotnet/dist/release --clobber
 ```
 
-For release #2 and later, pull the prior release's `*-full.nupkg` into `dist/release/` first
-(`vpk download github --repo <url> --outputDir windows-dotnet/dist/release`) and pass `-NoClean`
-so `vpk` can compute a delta.
+Then build, x64 first, then arm64, both into `dist/release/`:
+
+```powershell
+pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0 -Runtime win-x64 -NoClean
+pwsh windows-dotnet/scripts/build-velopack-release.ps1 -Version 5.0.0.0 -Runtime win-arm64 -NoClean
+```
+
+`*-full.nupkg` matches both architectures' full packages. From the release after 5.0 on, also pass
+`--pattern "releases.win-arm64.json"`. For 5.0 itself leave it out: no earlier release carries an
+arm64 package or feed, so arm64's first release ships a full package with no delta.
+
+Run both builds with `-NoClean` once the previous release's files are in `dist/release/`. A build
+without it cleans its own architecture's files first, which would delete the package just
+downloaded. Even then it removes only the files of the architecture it is building, never the
+other's.
+
+Velopack's own command for this is `vpk download github`. Here it finds nothing, because it reads
+the repository's Latest release, which belongs to the Mac app.
+
+**The x64 pack command must not change.** x64 passes no `--channel`, which leaves it on Velopack's
+default, `win`, the feed every x64 install reads. arm64 packs with `--channel win-arm64` and gets
+its own feed. `ReleaseScriptPinsTests` fails if the script names a channel for x64.
+
+**Pack on an x64 PC, never on an Arm machine.** The x64 package packed on an Arm machine records
+rid `win` and no machine architecture, where one packed on an x64 PC records `win-x64` and `x64`,
+the same as the shipped 4.9.0.
 
 Same MCP payload here (`dist/publish-velopack/mcp/sanduhr-mcp.exe`); smoke it too:
 `pwsh windows-dotnet/scripts/smoke-mcp.ps1 -Exe windows-dotnet/dist/publish-velopack/mcp/sanduhr-mcp.exe`.
 
-Output (`windows-dotnet/dist/release/`): `626Labs.Sanduhr-win-Setup.exe`,
+Output (`windows-dotnet/dist/release/`), x64: `626Labs.Sanduhr-win-Setup.exe`,
 `626Labs.Sanduhr-<v>-full.nupkg`, `626Labs.Sanduhr-<v>-delta.nupkg` (#2+),
-`626Labs.Sanduhr-win-Portable.zip`, `releases.win.json`. (The `626Labs.` prefix is the
+`626Labs.Sanduhr-win-Portable.zip`, `releases.win.json`. And arm64, each name carrying its channel:
+`626Labs.Sanduhr-win-arm64-Setup.exe`, `626Labs.Sanduhr-<v>-win-arm64-full.nupkg`,
+`626Labs.Sanduhr-win-arm64-Portable.zip`, `releases.win-arm64.json`. (The `626Labs.` prefix is the
 Velopack packId — see the gotcha log before ever touching it.)
 
 ---
@@ -158,7 +200,7 @@ git push origin <branch>
 git push origin v<v>
 ```
 
-`windows-dotnet-release.yml` runs on the `v<v>` tag: it tests the solution, builds the Store MSIX, and drafts the GitHub Release with the MSIX attached. Let it draft the
+`windows-dotnet-release.yml` runs on the `v<v>` tag: it tests the solution on x64 and on Arm, builds both Store MSIX packages, and drafts the GitHub Release with both attached. Let it draft the
 GitHub Release. **Draft, not published** — a botched build can't go live silently. Otherwise build
 locally (Phase 4) and draft manually.
 
@@ -170,13 +212,43 @@ locally (Phase 4) and draft manually.
 $gh = "C:\Program Files\GitHub CLI\gh.exe"
 $repo = 'estevanhernandez-stack-ed/Sanduhr_f-r_Claude'
 
-# Upload EVERY file from dist/release/ (the auto-updater needs releases.win.json + *-full.nupkg,
-# not just Setup.exe).
+# Upload EVERY file from dist/release/, both architectures (each one's updater needs its own
+# feed, releases.win.json or releases.win-arm64.json, and its *-full.nupkg, not just Setup.exe).
 & $gh release upload v<v> (Get-ChildItem windows-dotnet/dist/release/* | ForEach-Object FullName) --repo $repo
+
+# The Arm check: runs the draft's own arm64 files on an Arm runner. It fails if a file or a feed
+# is missing, runs the arm64 Store package's contents, and installs the x64 installer and then
+# the arm64 one over it. Publish only when its `draft` job is green.
+(Get-Date).ToUniversalTime().ToString('o')   # the moment of the dispatch
+& $gh workflow run windows-dotnet-arm-check.yml --repo $repo --ref main -f tag=v<v>
+Start-Sleep -Seconds 10     # a dispatch registers a moment after the command returns
+& $gh run list --repo $repo --workflow windows-dotnet-arm-check.yml --event workflow_dispatch --limit 1 --json databaseId,createdAt,status,displayTitle
+& $gh run watch <databaseId> --repo $repo --exit-status
 
 & $gh release edit v<v> --notes-file docs/store/release-notes-<v>.md --repo $repo
 & $gh release edit v<v> --draft=false --latest=false --repo $repo
 ```
+
+The listing's `createdAt` must be later than the moment of the dispatch; if it is not, you are
+looking at an earlier run, so list again. Watch that run's id, and publish only when the `draft` job
+of that run is green.
+
+**If the check is red:**
+
+- **"Download the draft's files" fails with not-found.** The workflow's token cannot read a draft's
+  files. The fallback is a workflow change, not yet run: the release job uploads its files as a run
+  artifact, and the `draft` job takes a `run_id` input and fetches them with `gh run download`.
+  Make that change as its own pull request, with the failing log quoted, and run the check again.
+- **The asset check names a missing file.** Upload that file to the draft and run the check again.
+- **An installer, launch or switch step fails.** Do not publish. Do not delete the arm64 files and
+  publish x64 alone either: the 5.0 x64 build tells every Arm PC that a native build exists and
+  links to this release, so an x64-only 5.0 first needs a build without the notice (the spec's cut
+  order pairs the arm64 installer with the notice for this reason). Fix the cause in the step
+  that failed, not the check.
+
+The check's first step fails a draft that is missing any of the ten files (five per architecture).
+Before publishing, confirm there is exactly one draft for the tag (`gh release list`); the check
+reads the draft by tag, so with two drafts of one tag you could publish a draft it never checked.
 
 **Never mark a Windows release Latest.** The repo's Latest slot belongs to the Mac app, so a Windows release marked Latest hands Mac users who follow `/releases/latest` a `Setup.exe`. The Mac release command passes `--latest` explicitly, because GitHub's automatic pick weighs version numbers and `v2.x-mac` sorts below `v3.x`. Link Windows downloads to `/releases?q=v4` (Windows tags only) and Mac downloads to `/releases?q=mac`, never `/releases/latest`; 626labs.dev's Sanduhr page and this repo's landing page do. The Windows updater doesn't need the flag: Velopack's `GithubSource` lists every non-prerelease release and picks the newest with a feed. Untick "Set as the latest release" if you publish from the web UI.
 
@@ -215,8 +287,17 @@ reviewer letters stay here because they never go through the API.
    ```powershell
    python engine/console.py apps/sanduhr --json     # -> out/sanduhr-listing.json; ready + apiReady must hold
    ```
-3. **Package by hand, on the submission the API created.** Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
-   `windows-dotnet/dist/Sanduhr-Store-v<v>.msix` into the slot and wait for upload + validation.
+3. **Package by hand, on the submission the API created.** The packages that go to the Store are
+   the draft's own, the ones the Arm check ran, not the Phase 3 local builds, which nobody on the
+   project can run on Arm. Once the Arm check is green, fetch them over the local ones:
+   ```powershell
+   gh release download v<v> --pattern "Sanduhr-Store-*.msix" --dir windows-dotnet/dist --clobber
+   ```
+   Then Partner Center → Apps → **Sanduhr für Claude** → **Packages**. Drag
+   **both** packages into the slot, `windows-dotnet/dist/Sanduhr-Store-x64-v<v>.msix` and
+   `windows-dotnet/dist/Sanduhr-Store-arm64-v<v>.msix`, and wait for both to upload and validate.
+   The Store gives each device the package for its processor. The Store Listing Console's
+   `apps/sanduhr/config.toml` lists both file names under `packages`.
    If validation rejects on version (4th component non-zero), bump and re-run Phase 3. If it rejects
    the display name as unreserved with a mangled umlaut, the staged manifest was read as ANSI; see the
    gotcha log. Save the package section. The Store Listing Console cannot upload packages; this step is
@@ -304,6 +385,10 @@ both proven on the .NET build.
 
 | Symptom | Root cause | Fix |
 |---|---|---|
+| Every x64 install stops updating after a release | The x64 build was packed with a channel (`--channel`), so its feed is no longer `releases.win.json` | Never pass a channel for x64. Rebuild x64 with the script as committed and upload `releases.win.json`. `ReleaseScriptPinsTests` pins it |
+| The arm64 (or x64) feed is missing from a release | Only one architecture was built, or the second build was pointed at a different folder | Build both into `dist/release/`, x64 first. The Arm check's first step fails a draft that is missing a file |
+| `sanduhr-mcp.exe is 7x MB, over the 30 MB cap`, or `NETSDK1047 ... doesn't have a target for 'net10.0/win-...'` | Another restore of `Sanduhr.Mcp` (an editor's automatic one) rewrote its assets file without the runtime | From 5.0 the app's publish restores the server itself (`RestoreMcpServerForRuntime`, `PublishMcpServer`). If it still happens, close the editor and rebuild |
+| The x64 package from a release run records rid `win` and no machine architecture | It was packed on an Arm machine | Pack the Velopack release on an x64 PC, never on an Arm machine: there the same frozen command records `win-x64` and `x64`, as 4.9.0 did |
 | `dotnet publish` errors on a locked DLL | `Sanduhr.exe` is running | Quit from tray, re-run |
 | Store validation: "revision number other than zero" | 4th version component ≠ 0 | Bump the 3rd component; the scripts hard-fail on this |
 | `signtool` `0x8007000b` on sideload | Manifest Publisher CN ≠ the dev cert's subject | Temp-patch the manifest Publisher to the dev cert CN, build, restore (or use a cert whose CN matches) |
@@ -312,7 +397,7 @@ both proven on the .NET build.
 | `apply` refuses: "a submission is already pending", and that pending one is a certification failure | A failed submission stays pending, and once it has been opened in Partner Center (to read the report) its API record is stale: an in-place `apply --submission` answers WRITE NOT CONFIRMED (3.5.0, 2026-10-21) | Save the certification report, then `submit_write.py discard <appId> --submission <id> --yes` and `apply` fresh. Do it before anyone opens the new submission |
 | Certification fails on a keyword | Model names (Fable, Opus, Sonnet, Haiku) are third-party marks; "Fable 5" had passed review since 3.3 and failed 3.5.0.0 on 2026-10-21 | No model names in keywords (`store-listing-console/apps/sanduhr/copy/voice.md`). Every listing field is re-reviewed on every submission |
 | The reviewer cites a privacy mismatch, or the commit should wait | The hosted policy (626labs.dev/privacy.html#privacy-sanduhr) lags `docs/PRIVACY.md`; the reviewer reads the hosted page | Before `commit`, open a hub issue to sync the new rows (3.5.0: #253, 3.6.0: #258) and curl-check the live page for the new file names |
-| `vpk download github` finds 0 releases | It reads the repo's Latest release, which is the Mac's | Fetch the previous Windows feed directly: `gh release download v<prev> --pattern "*-full.nupkg" --pattern "releases.win.json" --dir windows-dotnet/dist/release`, then build with `-NoClean` |
+| `vpk download github` finds 0 releases | It reads the repo's Latest release, which is the Mac's | Use the `gh release download` command in Phase 4, which names the release by tag. For releases after 5.0, also pass `--pattern "releases.win-arm64.json"` for the arm64 feed. Then build both architectures with `-NoClean` |
 | `Add-AppxPackage` of a re-built sideload fails over an installed sideload of the same version | Windows refuses a different package with the same identity and version | Stamp local verification builds one patch up (`-Version 3.6.1.0`); they never ship |
 | MSIX launch fails "framework missing" on a fresh box | Published framework-dependent, not self-contained | `build-msix.ps1` already passes `--self-contained true`; don't flip it off |
 | Publish fails "sanduhr-mcp.exe is 70 MB, over the 30 MB cap" (or 4.7.0's 74 MB server shipped) | The server's restore lacked the ILLink package, so its trim step was the SDK's empty stub. `dotnet restore -r` sets `RuntimeIdentifiers` (plural), and `Sanduhr.Mcp.csproj` trims only when `RuntimeIdentifier` (singular) is set (proven 2026-11-08: `-r` restore = 0 ILLink entries in the server's `project.assets.json`, 4/4 untrimmed) | Both build scripts restore with `/p:RuntimeIdentifier=<rid>`, then publish `--no-restore`. By hand: same, never `dotnet restore -r` |

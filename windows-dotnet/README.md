@@ -385,6 +385,32 @@ Partner Center submission, and the 10.1.4.4 acceptance gates — lives in
 
 ---
 
+## Architectures
+
+From 5.0, Sanduhr ships for `win-x64` and `win-arm64`, on both channels.
+
+- **Store:** two packages in one submission, `Sanduhr-Store-x64-v<v>.msix` and
+  `Sanduhr-Store-arm64-v<v>.msix`, from `scripts/build-msix.ps1 -Runtime`. The architecture is
+  stamped into the staged manifest; the committed manifest stays `x64`.
+- **GitHub:** two installers on one release, from `scripts/build-velopack-release.ps1 -Runtime`.
+  arm64 packs into its own Velopack channel, `win-arm64`, so it has its own feed
+  (`releases.win-arm64.json`). x64 passes no channel and stays on `releases.win.json`. An install
+  follows the channel it was packaged with, so `UpdateChecker` names none. Both facts are pinned
+  by `ReleaseScriptPinsTests`.
+- **No one on the team owns Arm hardware.** arm64 runs on GitHub's `windows-11-arm` runner: the
+  CI job `build-test-arm64` runs the suites and the published app on every pull request, and the
+  `Windows .NET Arm check` workflow runs a draft release's own files before it is published.
+- **`scripts/check-architecture.ps1`** runs after every publish and fails on a binary for the
+  wrong processor.
+- **The Arm build notice.** An x64 GitHub install running emulated on an Arm PC says once that a
+  native build exists (`ArmBuildNotice`, `ArmBuildNoticeService`), and Settings, About, Updates
+  keeps the line. The Store build never shows it.
+- **Never launch a locally built Sanduhr to test this.** `smoke-launch.ps1` and
+  `check-install-switch.ps1` use the real data folders, and both are enforced CI-only: each
+  refuses to run unless `GITHUB_ACTIONS` is `true`, before it starts or stops anything.
+
+---
+
 ## Screenshots
 
 _TODO._ Add widget / focus-hourglass / sign-in screenshots here. Store tiles are

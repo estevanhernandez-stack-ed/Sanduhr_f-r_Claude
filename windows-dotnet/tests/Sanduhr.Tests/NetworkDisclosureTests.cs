@@ -118,6 +118,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/Desk/DeskReviewBar.xaml.cs", "your-browser", 1),
         ("Sanduhr.App/Interop/LauncherApps.cs", "your-browser", 1),
         ("Sanduhr.App/Modals/WebView2NotInstalledWindow.xaml.cs", "your-browser", 1),
+        ("Sanduhr.App/Services/ArmBuildNoticeService.cs", "your-browser", 1),
         ("Sanduhr.App/ViewModels/SettingsViewModel.cs", "your-browser", 1),
         ("Sanduhr.App/Views/SettingsWindow.xaml.cs", "your-browser", 1),
     ];
@@ -133,6 +134,7 @@ public class NetworkDisclosureTests
         ("Sanduhr.App/Interop/LauncherApps.cs", 2),
         ("Sanduhr.App/Interop/ShellFiles.cs", 1),
         ("Sanduhr.App/Modals/WebView2NotInstalledWindow.xaml.cs", 1),
+        ("Sanduhr.App/Services/ArmBuildNoticeService.cs", 1),
         ("Sanduhr.App/Services/McpLaunchProbe.cs", 1),
         ("Sanduhr.App/Services/StoreUpdateService.cs", 3),
         ("Sanduhr.App/Services/VaultService.cs", 1),
@@ -148,8 +150,9 @@ public class NetworkDisclosureTests
         ("Sanduhr.Core/UsagePublisher.cs", 2),
     ];
 
-    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 6 browser hand-offs, 11 local (the 11th: #144's MCP launch check).</summary>
-    private const int KnownSites = 42;
+    /// <summary>Lines the scan must find: 25 calls Sanduhr makes, 7 browser hand-offs (the 7th: the Arm build notice's
+    /// link, 5.0 spec 7), 11 local (the 11th: #144's MCP launch check).</summary>
+    private const int KnownSites = 43;
     private const int KnownOutboundSites = 25;
 
     private static HashSet<string> Allowed() =>

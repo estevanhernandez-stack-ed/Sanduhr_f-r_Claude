@@ -14,6 +14,16 @@ public sealed class PowerShellFactAttribute : FactAttribute
     }
 }
 
+/// <summary>A theory that is skipped, with a message, where Windows PowerShell isn't there to run the script.</summary>
+public sealed class PowerShellTheoryAttribute : TheoryAttribute
+{
+    public PowerShellTheoryAttribute()
+    {
+        if (!OperatingSystem.IsWindows()) Skip = "The script runs under Windows PowerShell 5.1; this is not Windows.";
+        else if (StatuslineScriptRunTests.FindPowerShell() is null) Skip = "powershell.exe was not found; the script run tests need it.";
+    }
+}
+
 /// <summary>A fact that is skipped, with a message, where Git for Windows' bash.exe cannot be found.</summary>
 public sealed class GitBashFactAttribute : FactAttribute
 {
