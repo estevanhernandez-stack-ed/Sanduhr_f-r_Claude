@@ -8,7 +8,7 @@ struct DeskFontChoice: Equatable {
 }
 
 /// One piece's part of a design's layout. Every member but `piece` is optional: absent leaves the current
-/// value alone. A hidden piece has no anchor, size, tilt, style or monitor. `tilt` is the fold (whole degrees, -20 to
+/// value alone. A hidden piece has no anchor, size, tilt, style, source or monitor. `tilt` is the fold (whole degrees, -20 to
 /// 20) and belongs to the piece's stack; `style` is the meter style, only on `DeskMeterStyles.pieces`; `monitor` is
 /// the display ("main", "all" or a display id from get_desk `monitors`). The companion takes one as any piece does;
 /// it is drawn once (DeskWindowPlan.drawnOnce), so "all" puts it on the main display.
@@ -20,6 +20,8 @@ struct DeskPieceLayout: Equatable {
     var tilt: Double?
     var style: DeskMeterStyle?
     var monitor: DeskDisplay? = nil
+    /// Which source a usage piece draws (2.46), only on `DeskMeterSources.pieces`. Nil leaves the piece's source alone.
+    var source: DeskMeterSource? = nil
 }
 
 /// A font a design names that this Mac lacks, with the link to get it when the design gave one.
@@ -102,7 +104,7 @@ struct DeskDesign: Equatable {
     static let maxJsonBytes = 128 * 1024
 
     static let fields = ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow"]
-    static let layoutMembers = ["anchor", "size", "hidden", "monitor", "tilt", "style"]
+    static let layoutMembers = ["anchor", "size", "hidden", "monitor", "tilt", "style", "source"]
     static let inkWords = ["auto", "light", "dark", "theme"]
 
     /// Fields Windows has and the Mac Desk lacks: refused with this reason.
@@ -216,7 +218,7 @@ struct DeskDesign: Equatable {
     private static func parseLayout(_ node: PackValue?, _ context: DeskDesignContext, _ r: inout [DeskReason]) -> [DeskPieceLayout]? {
         guard let node else { return nil }
         guard let lo = node.object else {
-            r.append(DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"))
+            r.append(DeskReason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style, source}"))
             return nil
         }
         if lo.count > maxPieces {
@@ -236,11 +238,11 @@ struct DeskDesign: Equatable {
                 continue
             }
             guard let po = lo[key]?.object else {
-                r.append(DeskReason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"))
+                r.append(DeskReason(field, "must be an object with anchor, size, hidden, monitor, tilt, style and source"))
                 continue
             }
             for bad in WidgetProposal.ordinalSorted(po.keys.filter { !layoutMembers.contains($0) }).prefix(3) {
-                r.append(DeskReason(field, "unknown member '\(clip(bad, 20))'; use anchor, size, hidden, monitor, tilt and style"))
+                r.append(DeskReason(field, "unknown member '\(clip(bad, 20))'; use anchor, size, hidden, monitor, tilt, style and source"))
             }
             var anchor: DeskAnchor?
             if let an = present(po["anchor"]) {
@@ -287,9 +289,18 @@ struct DeskDesign: Equatable {
                     style = DeskMeterStyles.parse(stn.string?.trimmingCharacters(in: .whitespaces).lowercased())
                 }
             }
-            if hidden == true { anchor = nil; size = nil; tilt = nil; style = nil; monitor = nil }
+            var source: DeskMeterSource?
+            if let srn = present(po["source"]) {
+                // A source only on a piece that takes one: a clock with a source is a mistake, not a no-op.
+                if let why = DeskMeterSources.refusal(widget: key, word: srn.string) {
+                    r.append(DeskReason(field + ".source", why))
+                } else {
+                    source = DeskMeterSources.parse(srn.string?.trimmingCharacters(in: .whitespaces).lowercased())
+                }
+            }
+            if hidden == true { anchor = nil; size = nil; tilt = nil; style = nil; monitor = nil; source = nil }
             pieces.append(DeskPieceLayout(piece: key, anchor: anchor, size: size, hidden: hidden, tilt: tilt, style: style,
-                                          monitor: monitor))
+                                          monitor: monitor, source: source))
         }
         // One slant per stack: two pieces sent to the same anchor of one display with different tilts cannot both be
         // honored. A piece that names no monitor keeps the display it is on now.
@@ -494,6 +505,7 @@ struct DeskDesign: Equatable {
                 if let t = p.tilt { pf.append(("tilt", Self.num(t))) }
                 if let st = p.style { pf.append(("style", .string(DeskMeterStyles.word(st)))) }
                 if let m = p.monitor { pf.append(("monitor", .string(Self.monitorJson(m)))) }
+                if let sr = p.source { pf.append(("source", .string(sr.rawValue))) }
                 lo.add(p.piece, .object(WidgetJson.object(pf)))
             }
             f.append(("layout", .object(lo)))

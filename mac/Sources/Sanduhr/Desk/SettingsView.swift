@@ -186,9 +186,12 @@ private struct DeskPieceExtra: View {
     var body: some View {
         switch widget {
         case _ where DeskMeterStyleSettings.shows(widget, in: layout):
-            DeskMeterStylePicker(widget: widget, layout: $layout)
-                .disabled(arranging)
-                .padding(.leading, 16)
+            VStack(alignment: .leading, spacing: 8) {
+                DeskMeterStylePicker(widget: widget, layout: $layout)
+                DeskMeterSourcePicker(widget: widget, layout: $layout)
+            }
+            .disabled(arranging)
+            .padding(.leading, 16)
         case "meetings":
             Toggle("Read today's meetings", isOn: $showMeetings)
                 .onChange(of: showMeetings) { _, on in
@@ -244,6 +247,46 @@ private struct DeskMeterStylePicker: View {
             set: { value in
                 var a = DeskArrangement(layout)
                 a.setStyle(widget, value)
+                layout = a.string
+            })
+    }
+}
+
+/// Desk, Where each piece sits, under the `claude` and `meters` pieces while Codex is on: which source the
+/// piece shows, Combined (every source that is on, in one bar), Claude or Codex. Writes the layout word's
+/// `src=` field (`DeskArrangement.setSource`), which Combined never writes. Hidden with only Claude on.
+private struct DeskMeterSourcePicker: View {
+    let widget: String
+    @Binding var layout: String
+    @State private var codexOn = DeskMeterSourceSettings.codexOn()
+
+    var body: some View {
+        Group {
+            if DeskMeterSources.offers(widget, codexOn: codexOn) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Picker(DeskMeterSources.title, selection: source) {
+                        ForEach(DeskMeterSource.allCases, id: \.self) { Text(DeskMeterSources.name($0)).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    Text(DeskMeterSources.caption)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sanduhrSetupDidChange)) { _ in
+            codexOn = DeskMeterSourceSettings.codexOn()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sanduhrSourcesDidChange)) { _ in
+            codexOn = DeskMeterSourceSettings.codexOn()
+        }
+    }
+
+    private var source: Binding<DeskMeterSource> {
+        Binding(
+            get: { DeskArrangement(layout).source(of: widget) },
+            set: { value in
+                var a = DeskArrangement(layout)
+                a.setSource(widget, value)
                 layout = a.string
             })
     }

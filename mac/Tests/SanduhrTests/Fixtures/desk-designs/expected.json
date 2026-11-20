@@ -427,11 +427,11 @@
       "reasons": [
         {
           "field": "layout.clock",
-          "message": "unknown member 'color'; use anchor, size, hidden, monitor, tilt and style"
+          "message": "unknown member 'color'; use anchor, size, hidden, monitor, tilt, style and source"
         },
         {
           "field": "layout.clock",
-          "message": "unknown member 'zindex'; use anchor, size, hidden, monitor, tilt and style"
+          "message": "unknown member 'zindex'; use anchor, size, hidden, monitor, tilt, style and source"
         }
       ],
       "fonts": []
@@ -569,6 +569,40 @@
         {
           "field": "layout.glow",
           "message": "is a Windows piece; the Mac Desk has no glow piece"
+        }
+      ],
+      "fonts": []
+    },
+    "source.json": {
+      "status": "ok",
+      "reasons": [],
+      "fonts": [],
+      "design": {
+        "layout": {
+          "meters": {
+            "anchor": "mr",
+            "source": "codex"
+          },
+          "claude": {
+            "source": "combined"
+          }
+        }
+      }
+    },
+    "source-bad.json": {
+      "status": "rejected",
+      "reasons": [
+        {
+          "field": "layout.clock.source",
+          "message": "only claude, meters take a source"
+        },
+        {
+          "field": "layout.meters.source",
+          "message": "must be one of combined, claude, codex"
+        },
+        {
+          "field": "layout.claude.source",
+          "message": "must be one of combined, claude, codex"
         }
       ],
       "fonts": []

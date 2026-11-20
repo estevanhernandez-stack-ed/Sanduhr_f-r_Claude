@@ -243,7 +243,7 @@ struct DeskView: View {
             if let widget = Widget(rawValue: p.widget) {
                 if extra == nil {
                     DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
-                              style: p.style)
+                              style: p.style, source: p.source)
                         .deskArrangeable(p, mode: model.arrange)
                         .oledDrift(model)
                 } else {
@@ -260,7 +260,7 @@ struct DeskView: View {
     private func extraPiece(_ widget: Widget, _ p: DeskPlacement, alignment: HorizontalAlignment,
                             lineInLayout: Bool) -> some View {
         DeskPiece(widget: widget, model: model, alignment: alignment, lineInLayout: lineInLayout, scale: p.scale,
-                  style: p.style)
+                  style: p.style, source: p.source)
             .oledDrift(model)
     }
 }
@@ -305,6 +305,8 @@ struct DeskPiece: View {
     var scale: Double = 1
     /// How the claude line and the Claude limits draw (the layout word's style); other pieces ignore it.
     var style: DeskMeterStyle = .bar
+    /// Which source the claude line and the Claude limits draw (the layout word's `src=` field); other pieces ignore it.
+    var source: DeskMeterSource = .combined
 
     @AppStorage("font", store: .desk) private var savedFont: String?
     /// The Desk font as drawn: EsteFont Pro unless a font was picked (DeskFont, item 58).
@@ -342,8 +344,8 @@ struct DeskPiece: View {
     private var piece: some View {
         switch widget {
         case .clock: clock.deskPieceClickArea(.clock, model) { $0.clockFrame = $1 }.deskInk()
-        case .claude: claude.deskPieceClickArea(.claudeLine, model) { $0.claudeLineFrame = $1 }.deskInk()
-        case .meters: meters.deskInk()
+        case .claude: sourcedClaude.deskPieceClickArea(.claudeLine, model) { $0.claudeLineFrame = $1 }.deskInk()
+        case .meters: sourcedMeters.deskInk()
         case .nowPlaying: nowPlaying.deskInk()
         case .telemetry:
             DeskTelemetryPiece(sample: model.telemetry, style: style, ink: ink, font: font, timeSize: timeSize,
@@ -380,6 +382,37 @@ struct DeskPiece: View {
                     .opacity(0.85)
             }
         }
+    }
+
+    /// The claude line for the source this piece draws: Claude's own (below) unless Codex is on and the piece
+    /// shows Codex, in which case the line is Codex's. With only Claude on it is always Claude's.
+    @ViewBuilder
+    private var sourcedClaude: some View {
+        if model.drawn(source) == .codex {
+            DeskSourceClaude(view: model.sourceView(.codex), style: style, ink: ink, font: font, timeSize: timeSize,
+                             alignment: alignment)
+        } else {
+            claude
+        }
+    }
+
+    /// The Claude limits for the source this piece draws: Claude's own (`meters`) unless Codex is on and the
+    /// piece shows Codex or the sources joined.
+    @ViewBuilder
+    private var sourcedMeters: some View {
+        let drawn = model.drawn(source)
+        if drawn == .claude {
+            meters
+        } else {
+            DeskSourceMeters(model: model, drawn: drawn, style: style, ink: ink, font: font, timeSize: timeSize,
+                             alignment: alignment)
+        }
+    }
+
+    /// The session and week gauges the claude piece's ring and ticks draw: the joined ones when the piece
+    /// shows both sources, else Claude's own.
+    private var claudeGaugeList: [DeskMeterStyleModel.Gauge] {
+        model.drawn(source) == .combined ? model.combinedView.gauges : model.claudeGauges
     }
 
     /// The claude line. During an account switch the old account's line keeps its place unseen
@@ -480,10 +513,10 @@ struct DeskPiece: View {
     private func styledClaude(_ two: DeskClaudeCompact) -> some View {
         let size = timeSize * 0.19
         let stale = model.claudeLineIsStale
-        if DeskMeterStyleModel.claudeForm(style) == .gauges, !model.claudeGauges.isEmpty {
+        if DeskMeterStyleModel.claudeForm(style) == .gauges, !claudeGaugeList.isEmpty {
             VStack(alignment: alignment, spacing: timeSize * 0.17 * 0.3) {
                 claudeName(two, size: timeSize * 0.17).opacity(0.75)
-                DeskStyledGauges(gauges: model.claudeGauges, style: style, ink: ink, font: font,
+                DeskStyledGauges(gauges: claudeGaugeList, style: style, ink: ink, font: font,
                                  size: timeSize * 0.17, width: timeSize * 2.6, alignment: alignment)
             }
             .opacity(stale ? 0.6 : 1)
@@ -797,6 +830,18 @@ struct MeterRow: View {
     /// "92%", or "92%, nearly full" on a warning row, for VoiceOver.
     private var spokenValue: String { MeterWarning.spokenValue(percent: row.percent, warning: row.warning) }
 
+    /// The bar's fill: the one usage fill, as it always has been, or a row two sources share (a combined
+    /// piece) drawn as the sources' two-tone fill and ticks.
+    @ViewBuilder
+    private func fill(barHeight: CGFloat) -> some View {
+        if let layout = row.layout {
+            DeskSourceBarFill(layout: layout, width: width, height: barHeight, tickHeight: barHeight * 2)
+        } else {
+            Capsule().fill(row.warning ? AnyShapeStyle(Self.warningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
+                .frame(width: width * row.fill)
+        }
+    }
+
     var body: some View {
         let barHeight = max(4, size * 0.38)
         VStack(alignment: alignment, spacing: size * 0.22) {
@@ -819,13 +864,12 @@ struct MeterRow: View {
             }
             ZStack(alignment: .leading) {
                 Capsule().fill(LinearGradient.ink(ink)).opacity(0.22)
-                Capsule().fill(row.warning ? AnyShapeStyle(Self.warningRed) : AnyShapeStyle(LinearGradient.ink(ink)))
-                    .frame(width: width * row.fill)
+                fill(barHeight: barHeight)
             }
             .frame(width: width, height: barHeight)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(row.label)
-            .accessibilityValue(spokenValue)
+            .accessibilityLabel(row.layout?.accessibleName ?? row.label)
+            .accessibilityValue(row.layout == nil ? spokenValue : "")
             .background {
                 // A warning row: a steady glow in the ink wrapping the bar, as the notch glows.
                 if row.warning {

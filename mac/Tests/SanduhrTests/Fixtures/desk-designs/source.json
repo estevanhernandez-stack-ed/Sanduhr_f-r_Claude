@@ -1,0 +1,11 @@
+{
+  "layout": {
+    "meters": {
+      "anchor": "mr",
+      "source": "codex"
+    },
+    "claude": {
+      "source": " Combined "
+    }
+  }
+}
