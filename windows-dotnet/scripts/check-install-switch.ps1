@@ -8,9 +8,11 @@
     1. Install the x64 installer. On an Arm PC that Sanduhr runs through emulation, so it must
        record that the Arm build notice was due.
     2. Put a marker file in each of Sanduhr's data folders.
-    3. Install the arm64 installer in place. The installed app must be arm64, its package's
-       channel must be win-arm64 (the feed it will update from), the markers must still be
-       there, the app must start, and it must not record the notice as due.
+    3. Start the installed x64 app and leave it running, the way the notice finds it, then
+       install the arm64 installer in place without stopping it. Say what Setup did with the
+       running copy. The installed app must be arm64, its package's channel must be win-arm64
+       (the feed it will update from), the markers must still be there, the app must start,
+       and it must not record the notice as due.
 
   CI RUNNERS ONLY, and enforced. It installs, launches and replaces Sanduhr, kills running copies,
   writes markers into the real data folders and deletes the real log. So before it stops, installs,
@@ -62,19 +64,53 @@ function Wait-ForExit {
 }
 
 function Install-Setup {
-    param([string]$Setup)
+    # -RunningId: the id of a Sanduhr this script started and left running before the install.
+    param([string]$Setup, [int]$RunningId = 0)
     $name = [System.IO.Path]::GetFileName($Setup)
-    Write-Output "[switch] installing $name"
+    if ($RunningId) { Write-Output "[switch] installing $name while the installed app runs (pid $RunningId)" }
+    else { Write-Output "[switch] installing $name" }
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
     Wait-ForExit (Start-Process -FilePath $Setup -ArgumentList '--silent' -PassThru) 300 $name
+    Write-Output "[switch] $name exited 0 after $([math]::Round($timer.Elapsed.TotalSeconds)) seconds"
     $deadline = (Get-Date).AddSeconds(60)
     while (-not (Test-Path -LiteralPath $exe) -and ((Get-Date) -lt $deadline)) { [System.Threading.Thread]::Sleep(1000) }
     if (-not (Test-Path -LiteralPath $exe)) { throw "No $exe after $name." }
     # Setup may start the app when it finishes; the documentation does not say. Give a started app time to
     # settle and say so, then stop it, so every launch below is this script's own.
     [System.Threading.Thread]::Sleep(10000)
-    if (Get-Process -Name Sanduhr -ErrorAction SilentlyContinue) { Write-Output "[switch] note: $name started the app after a silent install" }
-    else { Write-Output "[switch] note: $name did not start the app after a silent install" }
+    if ($RunningId) {
+        if (Get-Process -Id $RunningId -ErrorAction SilentlyContinue) {
+            Write-Output "[switch] running copy: $name left the running app (pid $RunningId) running; stopping it now"
+        } else {
+            Write-Output "[switch] running copy: $name closed the running app (pid $RunningId) and installed over it"
+        }
+    }
+    if (@(Get-Process -Name Sanduhr -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $RunningId }).Count -gt 0) {
+        Write-Output "[switch] note: $name started the app after a silent install"
+    } else {
+        Write-Output "[switch] note: $name did not start the app after a silent install"
+    }
     Stop-Sanduhr
+}
+
+function Start-Running {
+    # The installed app, started the way smoke-launch.ps1 starts it, and left running: the state the notice finds.
+    $p = Start-Process -FilePath $exe -ArgumentList '--demo' -PassThru
+    $null = $p.Handle
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+        $p.Refresh()
+        if ($p.HasExited) { throw "The installed app exited during startup (code $($p.ExitCode))." }
+        if ($p.MainWindowHandle -ne [System.IntPtr]::Zero) { break }
+        [System.Threading.Thread]::Sleep(500)
+    }
+    $p.Refresh()
+    if ($p.MainWindowHandle -eq [System.IntPtr]::Zero) { Write-Host "[switch] note: the installed app is running (pid $($p.Id)) but showed no main window in 60 seconds" }
+    [System.Threading.Thread]::Sleep(5000)
+    $p.Refresh()
+    if ($p.HasExited) { throw "The installed app exited within seconds of starting (code $($p.ExitCode))." }
+    Write-Host "[switch] the installed x64 app is up and left running (pid $($p.Id))"
+    return $p.Id
 }
 
 function Assert-Installed {
@@ -108,8 +144,11 @@ foreach ($d in $dataDirs) {
 }
 if (Test-Path -LiteralPath $logFile) { Remove-Item -LiteralPath $logFile -Force }
 
-# 3. The arm64 build over it, in place.
-Install-Setup $Arm64Setup
+# 3. The arm64 build over it, with the x64 app still running: the notice arrives while it runs, so a person
+# runs the arm64 Setup with Sanduhr open. The installed tree, the channel and the markers are asserted the
+# same either way.
+$runningId = Start-Running
+Install-Setup $Arm64Setup -RunningId $runningId
 Assert-Installed -Runtime 'win-arm64' -Channel 'win-arm64'
 foreach ($d in $dataDirs) {
     if (-not (Test-Path -LiteralPath (Join-Path $d 'arm-check-marker.txt'))) { throw "The marker in $d did not survive the switch." }
@@ -118,4 +157,4 @@ Write-Output '[switch] every data folder kept its marker'
 & (Join-Path $PSScriptRoot 'smoke-launch.ps1') -Exe $exe
 if (Test-NoticeDue) { throw 'The arm64 build recorded the Arm build notice as due. It must stay silent on a native build.' }
 
-Write-Output '[switch] OK: x64 to arm64 in place.'
+Write-Output '[switch] OK: x64 to arm64 in place, installed over a running x64 app.'
