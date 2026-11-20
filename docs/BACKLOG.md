@@ -394,3 +394,6 @@ from their own art does that with Claude outside Sanduhr; Sanduhr just uses the 
 - A dry-run mode for the release workflow: build both Store packages at a test version without drafting.
 - Unverified, older than this work: whether Velopack's GitHub source reads only the newest page of
   releases, which matters because the Mac app releases often.
+- Unread: the manifest (`626Labs.Sanduhr.nuspec`) of an x64 package packed on an Arm machine. The
+  installed record (`sq.version`) is the same as a PC-packed one. One line in the Arm check's `built`
+  job that prints the manifest's rid and machine architecture settles it.

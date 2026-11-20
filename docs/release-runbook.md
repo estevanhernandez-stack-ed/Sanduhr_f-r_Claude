@@ -172,9 +172,12 @@ the repository's Latest release, which belongs to the Mac app.
 default, `win`, the feed every x64 install reads. arm64 packs with `--channel win-arm64` and gets
 its own feed. `ReleaseScriptPinsTests` fails if the script names a channel for x64.
 
-**Pack on an x64 PC, never on an Arm machine.** The x64 package packed on an Arm machine records
-rid `win` and no machine architecture, where one packed on an x64 PC records `win-x64` and `x64`,
-the same as the shipped 4.9.0.
+**Pack on an x64 PC.** Every x64 package that has shipped was packed on one, and the rehearsal of
+2026-11-20 ran one of those on Arm. An x64 package holds two records that differ on every build,
+4.9.0 included: its manifest (`626Labs.Sanduhr.nuspec`) says rid `win-x64` and machine architecture
+`x64`, and the installed copy's `sq.version` says rid `win` and no machine architecture. The Arm
+check prints the installed one, so `rid win` and a blank machine architecture on its x64 line are
+normal. What the manifest says when the x64 package is packed on an Arm machine has not been read.
 
 Same MCP payload here (`dist/publish-velopack/mcp/sanduhr-mcp.exe`); smoke it too:
 `pwsh windows-dotnet/scripts/smoke-mcp.ps1 -Exe windows-dotnet/dist/publish-velopack/mcp/sanduhr-mcp.exe`.
@@ -232,6 +235,10 @@ Start-Sleep -Seconds 10     # a dispatch registers a moment after the command re
 The listing's `createdAt` must be later than the moment of the dispatch; if it is not, you are
 looking at an earlier run, so list again. Watch that run's id, and publish only when the `draft` job
 of that run is green.
+
+Rehearsed on a draft on 2026-11-20 (run 44725897790, a throwaway draft at 0.9.1.0, deleted after):
+the workflow's token reads a draft's files, and the `draft` job passed every step in about two and
+a half minutes.
 
 **If the check is red:**
 
@@ -388,7 +395,7 @@ both proven on the .NET build.
 | Every x64 install stops updating after a release | The x64 build was packed with a channel (`--channel`), so its feed is no longer `releases.win.json` | Never pass a channel for x64. Rebuild x64 with the script as committed and upload `releases.win.json`. `ReleaseScriptPinsTests` pins it |
 | The arm64 (or x64) feed is missing from a release | Only one architecture was built, or the second build was pointed at a different folder | Build both into `dist/release/`, x64 first. The Arm check's first step fails a draft that is missing a file |
 | `sanduhr-mcp.exe is 7x MB, over the 30 MB cap`, or `NETSDK1047 ... doesn't have a target for 'net10.0/win-...'` | Another restore of `Sanduhr.Mcp` (an editor's automatic one) rewrote its assets file without the runtime | From 5.0 the app's publish restores the server itself (`RestoreMcpServerForRuntime`, `PublishMcpServer`). If it still happens, close the editor and rebuild |
-| The x64 package from a release run records rid `win` and no machine architecture | It was packed on an Arm machine | Pack the Velopack release on an x64 PC, never on an Arm machine: there the same frozen command records `win-x64` and `x64`, as 4.9.0 did |
+| The Arm check's x64 line reads `rid win` and a blank machine architecture | Nothing is wrong. That line prints the installed copy's `sq.version`, which reads that way on every x64 build, 4.9.0 included; the package's manifest holds `win-x64` and `x64` | Go on. The check tests only the channel, which must be `win` |
 | `dotnet publish` errors on a locked DLL | `Sanduhr.exe` is running | Quit from tray, re-run |
 | Store validation: "revision number other than zero" | 4th version component ≠ 0 | Bump the 3rd component; the scripts hard-fail on this |
 | `signtool` `0x8007000b` on sideload | Manifest Publisher CN ≠ the dev cert's subject | Temp-patch the manifest Publisher to the dev cert CN, build, restore (or use a cert whose CN matches) |
