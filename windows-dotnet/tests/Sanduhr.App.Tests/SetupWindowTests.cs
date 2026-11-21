@@ -434,4 +434,130 @@ public sealed class SetupWindowTests : AppWindowFixture
         }
         finally { widget.Dispose(); }
     });
+
+    // ---- the Start with a look strip and the window's height (5.0 desk looks, task 12 review) ----
+
+    private static string SixLookJson(string id, string name) => $$"""
+        {
+          "schema_version": 1, "id": "{{id}}", "name": "{{name}}", "blurb": "A test look.", "font_fallback": "Segoe UI",
+          "design": {
+            "layout": {
+              "clock": { "anchor": "tc", "size": 1.3 },
+              "message": { "hidden": true }, "claude": { "hidden": true }, "meters": { "hidden": true }, "nowPlaying": { "hidden": true },
+              "telemetry": { "hidden": true }, "weather": { "hidden": true }, "watchers": { "hidden": true }, "launcher": { "hidden": true },
+              "glow": { "hidden": true }, "companion": { "hidden": true }
+            },
+            "font": "Georgia", "ink": "auto", "plate": false, "shadow": true, "glow": false, "follows_theme": false
+          }
+        }
+        """;
+
+    /// <summary>A setup window over six test looks (the real catalog's count), shown off screen; the service is disposed with it.</summary>
+    private void WithSixLooks(Action<SetupWindow> body) => AppHost.Run(() =>
+    {
+        var paths = ScratchPaths();
+        var store = new SettingsStore(paths);
+        string[] names = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"];
+        using var service = new Sanduhr.App.Desk.DeskDesignService(paths, store)
+        {
+            LookCatalog = Sanduhr.Core.DeskLookCatalog.Load(names.Select(n => (n.ToLowerInvariant(), SixLookJson(n.ToLowerInvariant(), n))).ToArray()),
+            InstalledFonts = () => ["Georgia", "Segoe UI"],
+            Monitors = () => [],
+            DrawersReviewing = () => false,
+        };
+        service.LookWallpaper = () => null;
+        var vm = new SetupViewModel(new SetupService(store, new Host()), true, hasAccount: () => false, codexInstalled: () => false, looks: () => service);
+        Assert.Equal(6, vm.Looks.Count);
+        var w = new SetupWindow(vm);
+        OffScreen(w);
+        try { body(w); }
+        finally { w.Close(); }
+    });
+
+    private static T Named<T>(Window w, string name) where T : class =>
+        (w.FindName(name) as T) ?? throw new InvalidOperationException(name + " is not in the window");
+
+    private static bool IsInside(DependencyObject? node, DependencyObject ancestor)
+    {
+        for (; node is not null; node = System.Windows.Media.VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node))
+            if (ReferenceEquals(node, ancestor)) return true;
+        return false;
+    }
+
+    [Fact]
+    public void The_window_is_never_taller_than_the_work_area() => WithSixLooks(w =>
+    {
+        Assert.Equal(SystemParameters.WorkArea.Height, w.MaxHeight);
+    });
+
+    [Fact]
+    public void Continue_sits_below_the_scroller_and_the_tiles_and_the_looks_row_scroll_with_it() => WithSixLooks(w =>
+    {
+        w.Show();
+        var scroller = Named<System.Windows.Controls.ScrollViewer>(w, "SetupScroller");
+        Assert.False(scroller.Focusable);
+        Assert.False(IsInside(Named<System.Windows.Controls.Button>(w, "ContinueButton"), scroller));
+        Assert.False(IsInside(Named<System.Windows.Controls.Button>(w, "DismissButton"), scroller));
+        foreach (var inside in new[] { "DesktopBox", "DrawersBox", "UsageBox", "CodexUsageBox", "StartWithALookRow" })
+            Assert.True(IsInside((DependencyObject)w.FindName(inside), scroller), inside);
+    });
+
+    [Fact]
+    public void Six_looks_are_one_strip_a_single_row_that_scrolls_sideways() => WithSixLooks(w =>
+    {
+        w.Show();
+        w.UpdateLayout();
+        var strip = Named<System.Windows.Controls.ScrollViewer>(w, "LooksStrip");
+        Assert.False(strip.Focusable);
+        Assert.Equal(System.Windows.Controls.ScrollBarVisibility.Auto, strip.HorizontalScrollBarVisibility);
+        Assert.Equal(System.Windows.Controls.ScrollBarVisibility.Disabled, strip.VerticalScrollBarVisibility);
+        var row = Named<System.Windows.Controls.StackPanel>(w, "StartWithALookRow");
+        Assert.True(row.ActualHeight < 240, $"the row is {row.ActualHeight} DIPs tall");
+        Assert.True(strip.ScrollableWidth > 0, "six cards are wider than the window, so the strip scrolls");
+        Assert.True(HasPanel<System.Windows.Controls.StackPanel>(strip, p => p.Orientation == System.Windows.Controls.Orientation.Horizontal && p.Children.Count == 6));
+        Assert.False(HasPanel<System.Windows.Controls.WrapPanel>(strip, _ => true));
+    });
+
+    private static bool HasPanel<TPanel>(DependencyObject root, Func<TPanel, bool> match) where TPanel : System.Windows.Controls.Panel
+    {
+        if (root is TPanel p && match(p)) return true;
+        int n = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < n; i++)
+            if (HasPanel(System.Windows.Media.VisualTreeHelper.GetChild(root, i), match)) return true;
+        return false;
+    }
+
+    [Fact]
+    public void With_a_small_cap_the_window_obeys_it_the_tiles_scroll_and_Continue_stays_in_view() => WithSixLooks(w =>
+    {
+        w.MaxHeight = 500;
+        w.Show();
+        w.UpdateLayout();
+        var scroller = Named<System.Windows.Controls.ScrollViewer>(w, "SetupScroller");
+        var cont = Named<System.Windows.Controls.Button>(w, "ContinueButton");
+        Assert.True(w.ActualHeight <= 500, $"the window is {w.ActualHeight} DIPs tall");
+        Assert.True(scroller.ScrollableHeight > 0);
+        var content = (FrameworkElement)w.Content;
+        double bottom = cont.TranslatePoint(new Point(0, cont.ActualHeight), content).Y;
+        Assert.True(bottom <= content.ActualHeight + 0.5, $"Continue ends at {bottom} of {content.ActualHeight}");
+    });
+
+    [Fact]
+    public void The_wheel_over_the_strip_scrolls_it_sideways_and_is_not_swallowed() => WithSixLooks(w =>
+    {
+        w.Show();
+        w.UpdateLayout();
+        var strip = Named<System.Windows.Controls.ScrollViewer>(w, "LooksStrip");
+        Assert.True(strip.ScrollableWidth > 0);
+        Assert.Equal(0, strip.HorizontalOffset);
+        var wheel = new System.Windows.Input.MouseWheelEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, -120)
+        {
+            RoutedEvent = UIElement.PreviewMouseWheelEvent,
+            Source = strip,
+        };
+        strip.RaiseEvent(wheel);
+        w.UpdateLayout();   // the scroll content applies a requested offset on its next arrange
+        Assert.True(strip.HorizontalOffset > 0, "a negative delta moves the strip to the right");
+        Assert.True(wheel.Handled);
+    });
 }

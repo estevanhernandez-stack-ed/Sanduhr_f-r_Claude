@@ -153,7 +153,7 @@ public sealed class SetupLookTests : IDisposable
         Assert.Null(vm.PickedLook);
         Assert.DoesNotContain(vm.Looks, l => l.Picked);
         Assert.Empty(host.Calls);   // nothing changes until Continue
-        Assert.False(File.Exists(_paths.DesignsDir));
+        Assert.False(Directory.Exists(_paths.DesignsDir));
     });
 
     [Fact]

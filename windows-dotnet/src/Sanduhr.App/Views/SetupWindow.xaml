@@ -129,7 +129,18 @@
         </Style>
     </Window.Resources>
 
-    <StackPanel Margin="26,24,26,22">
+    <!-- Two rows: the tiles scroll when the screen is short (MaxHeight is the work area), and Continue never leaves the window. -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ScrollViewer x:Name="SetupScroller" Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      Focusable="False">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+            </ScrollViewer.Resources>
+    <StackPanel Margin="26,24,26,0">
         <TextBlock Text="{x:Static core:SetupCopy.Title}" FontSize="18" FontWeight="SemiBold"
                    Foreground="{DynamicResource Sanduhr.Brush.Accent}"
                    AutomationProperties.HeadingLevel="Level1" />
@@ -160,10 +171,13 @@
                        Foreground="{DynamicResource Sanduhr.Brush.Text}" />
             <TextBlock Text="{x:Static core:SetupCopy.StartWithALookCaption}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,8"
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
-            <ItemsControl ItemsSource="{Binding Looks}" Focusable="False" KeyboardNavigation.DirectionalNavigation="Contained">
+            <ScrollViewer x:Name="LooksStrip" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Focusable="False"
+                          PreviewMouseWheel="LooksStrip_PreviewMouseWheel">
+            <ItemsControl ItemsSource="{Binding Looks}" Focusable="False" Margin="0,0,0,6"
+                          KeyboardNavigation.DirectionalNavigation="Contained">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <WrapPanel />
+                        <StackPanel Orientation="Horizontal" />
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -186,8 +200,8 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </ScrollViewer>
         </StackPanel>
-
 
         <CheckBox x:Name="DrawersBox" Style="{StaticResource TickTile}" Margin="0,16,0,0" IsChecked="{Binding Drawers}"
                   AutomationProperties.Name="{x:Static core:SetupCopy.DrawersTitle}"
@@ -235,7 +249,10 @@
                    AutomationProperties.LiveSetting="Polite"
                    Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
                    Visibility="{Binding HasChangeLines, Converter={StaticResource BoolVis}}" />
+    </StackPanel>
+        </ScrollViewer>
 
+        <StackPanel Grid.Row="1" Margin="26,0,26,22">
         <!-- Why Continue is off. -->
         <TextBlock Text="{Binding Blocked}" TextWrapping="Wrap" FontSize="11" Margin="0,14,0,0"
                    Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
@@ -273,5 +290,6 @@
                     Content="{x:Static core:SetupCopy.Continue}" Command="{Binding ContinueCommand}" IsDefault="True"
                     AutomationProperties.Name="{x:Static core:SetupCopy.Continue}" />
         </StackPanel>
-    </StackPanel>
+        </StackPanel>
+    </Grid>
 </Window>
