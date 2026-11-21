@@ -30,6 +30,7 @@ public static partial class Program
         public string? SortNow() => null;
         public void SetUsage(bool on) { }
         public void ReloadDesk() { }
+        public string? ApplyLook(string id) => null;
     }
 
     static async Task RenderSetup(dynamic vm, Assembly asm)
