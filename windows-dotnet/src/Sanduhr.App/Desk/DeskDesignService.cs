@@ -103,11 +103,16 @@ internal sealed class DeskDesignService : IDisposable
         InstalledFonts = InstalledWithPacks;
         Handoff = new DeskDesignHandoff(new DeskDesignPaths(paths.ExternalDir), Context) { Handler = OnProposal };
         _settle = new DispatcherTimer(DispatcherPriority.Background, _ui) { Interval = Settle };
-        _settle.Tick += (_, _) =>
-        {
-            _settle.Stop();
-            Publish();
-        };
+        _settle.Tick += (_, _) => Settled();
+    }
+
+    /// <summary>Things have settled (the timer's tick): the state is written once, and the look cards are told once, whether or not the
+    /// MCP integration is on (a wallpaper change fires several events, and the picture is only readable after Windows is done with it).</summary>
+    internal void Settled()
+    {
+        _settle.Stop();
+        Publish();
+        LooksChanged?.Invoke();
     }
 
     /// <summary>The request and result files, and the state writer.</summary>
@@ -201,14 +206,12 @@ internal sealed class DeskDesignService : IDisposable
         if (e.Category is UserPreferenceCategory.Desktop or UserPreferenceCategory.Color)
         {
             Refresh();
-            LooksChanged?.Invoke();
         }
     }
 
     private void OnDisplayChanged(object? sender, EventArgs e)
     {
         Refresh();
-        LooksChanged?.Invoke();
     }
 
     private void OnFontsChanged(object? sender, EventArgs e) => _ui.BeginInvoke(FontsChanged);
@@ -219,7 +222,6 @@ internal sealed class DeskDesignService : IDisposable
     {
         _fonts = null;
         Refresh();
-        LooksChanged?.Invoke();
         if (_review is not null && !_disposed) ShowReview();
     }
 

@@ -145,10 +145,22 @@ public class DeskGlowTests
         Assert.Equal(0.6, DeskInk.CapWhite(DeskInk.Resolve(DeskInkSettings.Default.WithGlow(true), null, null)).Glow);
 
     [Fact]
-    public void MatchNowTurnsTheShadowOnAndTheGlowOff()
+    public void MatchNowKeepsTheGlowWhenItIsOn()
     {
         var look = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]);
-        var own = ThemeMatch.OwnSettings(look, DeskSettings.Default, DeskInkSettings.Default.WithGlow(true),
+        var own = ThemeMatch.OwnSettings(look, DeskSettings.Default, DeskInkSettings.Default.WithGlow(true).WithGlowStrength(0.8),
+            DeskMessageSettings.Default, NowPlayingSettings.Default);
+        Assert.True(own.Ink.Glow);
+        Assert.Equal(0.8, own.Ink.GlowStrength);
+        Assert.False(own.Ink.Shadow);
+        Assert.Equal(DeskInkMode.Custom, own.Ink.Mode);
+    }
+
+    [Fact]
+    public void MatchNowTurnsTheShadowOnWhenThereIsNoGlow()
+    {
+        var look = ThemeDeskLook.From(ThemeCatalog.BuiltIns["obsidian"]);
+        var own = ThemeMatch.OwnSettings(look, DeskSettings.Default, DeskInkSettings.Default with { Shadow = false },
             DeskMessageSettings.Default, NowPlayingSettings.Default);
         Assert.True(own.Ink.Shadow);
         Assert.False(own.Ink.Glow);

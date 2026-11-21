@@ -143,7 +143,7 @@ public sealed partial class DeskLooksViewModel : ObservableObject
     private void Say(DesignActionResult result)
     {
         Status = "";   // the same line twice is one change to a live region: clear it first
-        Status = result.Message;   // streamer: cant - fixed copy and a built-in look's name, never the user's text
+        Status = result.Message;   // streamer: notname - fixed copy and a built-in look's name, never the user's text
         Reload();
     }
 

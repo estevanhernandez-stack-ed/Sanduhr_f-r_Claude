@@ -73,12 +73,33 @@ public sealed class DeskGlowSettingsTests : IDisposable
         var vm = Desk();
         vm.InkGlow = true;
         vm.InkGlowPercent = 85;
+        Assert.Equal("85%", vm.InkGlowPercentText);   // the text follows the thumb at once
+        vm.Flush();   // the drag settles
         Assert.Equal(0.85, _store.LoadDeskInk().GlowStrength);
-        Assert.Equal("85%", vm.InkGlowPercentText);
 
         var again = Desk();
         Assert.True(again.InkGlow);
         Assert.Equal(85, again.InkGlowPercent);
+    });
+
+    [Fact]
+    public void A_drag_of_the_strength_saves_once() => Sta.Run(() =>
+    {
+        var vm = Desk();
+        vm.InkGlow = true;
+        int changes = 0;
+        vm.Changed = () => changes++;
+
+        foreach (var v in new double[] { 70, 75, 80, 90, 100 }) vm.InkGlowPercent = v;
+        Assert.Equal(0, changes);   // nothing is written or rebuilt mid-drag
+        Assert.Equal(0.6, _store.LoadDeskInk().GlowStrength);
+        Assert.Equal("100%", vm.InkGlowPercentText);
+
+        vm.Flush();
+        Assert.Equal(1, changes);
+        Assert.Equal(1.0, _store.LoadDeskInk().GlowStrength);
+        vm.Flush();
+        Assert.Equal(1, changes);   // a second flush has nothing left to save
     });
 
     [Fact]
@@ -90,6 +111,19 @@ public sealed class DeskGlowSettingsTests : IDisposable
         vm.InkGlow = true;
         vm.InkShadow = true;   // which turns the glow off
         Assert.Equal([true, false], heard);
+    });
+
+    [Fact]
+    public void A_design_or_look_that_turns_the_glow_on_tells_the_message_box() => Sta.Run(() =>
+    {
+        var vm = Desk();
+        var heard = new List<bool>();
+        vm.InkGlowChanged += () => heard.Add(vm.InkGlow);
+        _store.SaveDeskInk(DeskInkSettings.Default.WithGlow(true));
+        vm.RefreshFromStore();
+        Assert.Equal([true], heard);
+        vm.RefreshFromStore();
+        Assert.Equal([true], heard);   // told once, not on every reload
     });
 
     [Fact]

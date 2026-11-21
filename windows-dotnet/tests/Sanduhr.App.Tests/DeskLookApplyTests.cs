@@ -185,6 +185,19 @@ public sealed class DeskLookApplyTests : IDisposable
         Assert.Equal("Alpha is on your Desk. The Desk was switched on.", result.Message);
         Assert.True(_store.LoadDesk().Enabled);
         Assert.Equal(LayoutOf("alpha"), _store.LoadDesk().Layout);
+        s.PutBack();
+        Assert.True(_store.LoadDesk().Enabled);   // Put my Desk back does not switch the Desk off again
+    });
+
+    [Fact]
+    public void The_cards_are_told_once_things_settle_not_at_each_event() => WithService(s =>
+    {
+        int told = 0;
+        s.LooksChanged += () => told++;
+        s.FontsChanged();
+        Assert.Equal(0, told);   // a font event only asks for a refresh
+        s.Settled();
+        Assert.Equal(1, told);   // the settled refresh tells the gallery once
     });
 
     [Fact]

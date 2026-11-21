@@ -146,7 +146,7 @@ internal sealed class AppSetupHost(Func<DrawerService?> drawers, Func<DrawerRevi
     {
         if (Sanduhr.App.Desk.DeskDesignService.Current is not { } designs) return null;   // no Desk service: nothing to apply to
         var result = designs.ApplyLook(id);
-        return result.Ok ? null : result.Message;   // streamer: cant - fixed copy and a built-in look's name
+        return result.Ok ? null : result.Message;   // streamer: notname - fixed copy and a built-in look's name, never the user's text
     }
 
     /// <summary>What a return said, as the Drawers page words it: the failure alone, else the result line (counts only while streamer mode

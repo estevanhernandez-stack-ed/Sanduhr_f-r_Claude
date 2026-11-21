@@ -518,6 +518,19 @@ public sealed class SetupWindowTests : AppWindowFixture
         Assert.False(HasPanel<System.Windows.Controls.WrapPanel>(strip, _ => true));
     });
 
+    [Fact]
+    public void The_strip_is_one_Tab_stop_and_a_named_group() => WithSixLooks(w =>
+    {
+        w.Show();
+        w.UpdateLayout();
+        var row = Assert.IsType<DeskLooksRow>(Named<System.Windows.Controls.ScrollViewer>(w, "LooksStrip").Content);
+        var peer = UIElementAutomationPeer.CreatePeerForElement(row);
+        Assert.Equal(AutomationControlType.Group, peer.GetAutomationControlType());
+        Assert.Equal("Ready-made looks", peer.GetName());
+        Assert.Equal(System.Windows.Input.KeyboardNavigationMode.Once, System.Windows.Input.KeyboardNavigation.GetTabNavigation(row));
+        Assert.Equal(System.Windows.Input.KeyboardNavigationMode.Contained, System.Windows.Input.KeyboardNavigation.GetDirectionalNavigation(row));
+    });
+
     private static bool HasPanel<TPanel>(DependencyObject root, Func<TPanel, bool> match) where TPanel : System.Windows.Controls.Panel
     {
         if (root is TPanel p && match(p)) return true;

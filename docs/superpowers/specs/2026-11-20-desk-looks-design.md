@@ -195,8 +195,8 @@ Settings search finds the section under "looks", "gallery", "presets" and "style
   with its plate and glow when it has them, standing where the look puts its clock, and the piece map in
   the same ink. The map is drawn by the
   layout code `DeskLayoutMap` already uses (`DeskArrangement.Stacks`, `DeskGeometry`), for one screen.
-- **Bottom:** the blurb, then at most two notes, in this order: the fit notes from section 4, then what a
-  shown piece needs.
+- **Bottom:** the blurb, then at most two notes: the fit notes from section 4 first, then, when a
+  line is left, what a shown piece needs, drawn under the card as one wrapping run of links.
 - **The look that is the Desk now** carries "On your Desk" and a check mark.
 
 **What a shown piece needs.** One note, naming every piece the look shows that has nothing to draw:
@@ -220,7 +220,8 @@ would rewrite the Desk on every step. So each card is a button:
   them. Neither applies a look. The Settings redesign's guard "Tab reaches Pieces from the Desk page's
   first stop in under 10" is re-pinned to 11, because the Looks section, with its own jump link and Put my
   Desk back, sits above Pieces. This is the owner's to confirm.
-- Accessible name: "<name> look. <blurb> <notes>" and, on the current one, "On your Desk." The name
+- Accessible name: "<name> look. <blurb> <notes>" and, on the current one, "On your Desk." The needs are part
+  of the name, after the notes. The name
   changes when the state does.
 - The row has an accessible name, "Ready-made looks".
 - Every color on a card passes the light-mode and dark-mode checks the Settings pages already pass.

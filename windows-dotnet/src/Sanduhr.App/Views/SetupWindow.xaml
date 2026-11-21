@@ -173,8 +173,8 @@
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <ScrollViewer x:Name="LooksStrip" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Focusable="False"
                           PreviewMouseWheel="LooksStrip_PreviewMouseWheel">
-            <ItemsControl ItemsSource="{Binding Looks}" Focusable="False" Margin="0,0,0,6"
-                          KeyboardNavigation.DirectionalNavigation="Contained">
+            <views:DeskLooksRow ItemsSource="{Binding Looks}" Focusable="False" Margin="0,0,0,6"
+                          KeyboardNavigation.DirectionalNavigation="Contained" KeyboardNavigation.TabNavigation="Once">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal" />
@@ -199,7 +199,7 @@
                         </ToggleButton>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            </views:DeskLooksRow>
             </ScrollViewer>
         </StackPanel>
 
