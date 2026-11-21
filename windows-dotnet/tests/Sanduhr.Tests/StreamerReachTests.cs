@@ -124,7 +124,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Desk/DeskCompanion.cs", "key", 1),
         ("Sanduhr.App/Desk/DeskCompanion.cs", "notname", 2),
         ("Sanduhr.App/Desk/DeskController.cs", "notname", 1),
-        ("Sanduhr.App/Desk/DeskDesignService.cs", "notname", 8),
+        ("Sanduhr.App/Desk/DeskDesignService.cs", "notname", 9),
         ("Sanduhr.App/Desk/DeskHandoffSeams.cs", "notname", 4),
         ("Sanduhr.App/Desk/DeskLauncherPiece.cs", "notname", 2),   // controller, after Task 13: the Desk names an unlabelled link by codename
         ("Sanduhr.App/Desk/DeskLookResolver.cs", "notname", 3),

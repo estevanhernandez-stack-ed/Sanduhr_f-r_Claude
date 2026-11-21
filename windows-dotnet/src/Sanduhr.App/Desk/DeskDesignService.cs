@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Sanduhr.App.Services;
@@ -31,6 +32,14 @@ internal interface IDeskDesignHost
 /// <summary>What a saved-design action did, for the line Settings reads out.</summary>
 internal readonly record struct DesignActionResult(bool Ok, string Message);
 
+/// <summary>One ready-made look as the gallery draws it: the look, how it fits this PC (the design to draw and the notes), whether the
+/// Desk is that look now, and what its shown pieces still need.</summary>
+internal sealed record DeskLookCardData(DeskLook Look, DeskLookFitResult Fit, bool Current, IReadOnlyList<DeskLookNeed> Needs);
+
+/// <summary>The gallery's data: a card per look in the gallery's order, and the wallpaper's summary (null when unknown) for a card's
+/// backdrop color and its automatic ink.</summary>
+internal sealed record DeskLooksSnapshot(IReadOnlyList<DeskLookCardData> Cards, WallpaperOverview? Wallpaper);
+
 /// <summary>
 /// The agent-designed Desk, the app side (spec, the agent-designed Desk, MCP tools, the live review, saved designs). Three jobs:
 /// <list type="bullet">
@@ -44,7 +53,7 @@ internal readonly record struct DesignActionResult(bool Ok, string Message);
 /// Apply and Dismiss) and answered <c>previewing</c> at once; Dismiss answers <c>rejected</c>, Apply saves the Desk it replaces
 /// as a design, writes the new one and answers <c>applied</c>. With "Let Claude change the Desk directly" on, a design that needs
 /// no font is applied at once, still saving the previous Desk first. A newer proposal replaces a preview.</description></item>
-/// <item><description>Keeps the saved designs (<see cref="DesignStore"/>): switch to one, rename, pin, delete, and "Put my Desk back".</description></item>
+/// <item><description>Keeps the saved designs (<see cref="DesignStore"/>): switch to one, rename, pin, delete, and "Put my Desk back", and applies a ready-made look (<see cref="ApplyLook"/>).</description></item>
 /// </list>
 /// Nothing here is sent anywhere: the wallpaper summary is computed in this process from the image file the Automatic ink
 /// already reads, and leaves it only inside desk-state.json (and the preview file) for the local MCP client.
@@ -145,6 +154,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         if (!Enabled || _started || _disposed) return;
         _started = true;
+        LogSkippedLooks();
         SettingsStore.AnyWritten += OnSettingsWritten;
         if (_apps is not null) _apps.Changed += Refresh;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -488,6 +498,144 @@ internal sealed class DeskDesignService : IDisposable
         Handoff.Answer(review.Id, answer);
     }
 
+    // -- ready-made looks (5.0 spec 5) ---------------------------------------------------------------------
+
+    /// <summary>The ready-made looks (tests set it).</summary>
+    internal DeskLookCatalog LookCatalog { get; set; } = DeskLookFiles.Catalog;
+
+    /// <summary>The wallpaper the looks are fitted to (tests set it); null reads this PC's.</summary>
+    internal Func<WallpaperOverview?>? LookWallpaper { get; set; }
+
+    /// <summary>Whether a watcher is on the board, for a card's "Watchers needs a watcher." (the App sets it).</summary>
+    internal Func<bool> HasWatcher { get; set; } = () => false;
+
+    /// <summary>Names each look file that could not be used in the log, once at start: the file's name and why. The files are
+    /// ours, so nothing of the user's is written.</summary>
+    internal void LogSkippedLooks()
+    {
+        foreach (var skipped in LookCatalog.Skipped)
+        {
+            try { File.AppendAllText(_paths.LogFile, $"{DateTime.UtcNow:o} desk look skipped: {skipped}{Environment.NewLine}"); }   // streamer: notname - written to the log file, never drawn
+            catch (Exception) { /* the log is a courtesy */ }
+        }
+    }
+
+    /// <summary>The installed fonts as a look's rules read them: null when the list could not be read.</summary>
+    private IReadOnlyCollection<string>? FontsKnown()
+    {
+        _fonts ??= InstalledFonts();
+        return _fonts.Count == 0 ? null : _fonts;
+    }
+
+    /// <summary>What fitting a look knows about this PC: the fonts, the wallpaper and the Desk as it is. No Start-menu list (a look
+    /// carries no Launcher) and no connected-monitor list (a look names no monitor).</summary>
+    internal DeskDesignContext LookContext()
+    {
+        WallpaperOverview? wallpaper;
+        if (LookWallpaper is { } read) wallpaper = read();
+        else
+        {
+            _wallpaper.Refresh();
+            wallpaper = _wallpaper.Overview().Overview;
+        }
+        return new DeskDesignContext(FontsKnown(), wallpaper, null, CurrentDesign(), null);
+    }
+
+    /// <summary>The primary monitor's wallpaper, small, for the look cards; null when there is no picture to show. In memory only.</summary>
+    internal BitmapSource? LookPicture()
+    {
+        if (LookWallpaper is not null) return null;   // a test's wallpaper has no picture
+        _wallpaper.Refresh();
+        return _wallpaper.Picture();
+    }
+
+    /// <summary>Every look fitted to this PC now, for the gallery. The look that is the Desk is marked only while the Desk is on.</summary>
+    internal DeskLooksSnapshot LooksSnapshot()
+    {
+        var context = LookContext();
+        bool weather = _store.LoadDeskWeather().Place is not null;
+        bool launcher = !_store.LoadLauncher().IsEmpty;
+        bool watcher = HasWatcher();
+        var on = DeskIsOn() ? DeskLookFit.Untouched(LookCatalog.Looks, context.Current!, context.InstalledFonts) : null;
+        var cards = LookCatalog.Looks
+            .Select(l => new DeskLookCardData(l, DeskLookFit.Fit(l, context), ReferenceEquals(l, on), DeskLookFit.Needs(l, weather, launcher, watcher)))
+            .ToList();
+        return new DeskLooksSnapshot(cards, context.Wallpaper);
+    }
+
+    /// <summary>The Desk draws its pieces: the Desk switch is on, and setup's "A nicer desktop" was not unticked.</summary>
+    private bool DeskIsOn() => _store.LoadDesk().Enabled && _store.LoadSetup() is not { Desktop: false };
+
+    private void SwitchDeskOn()
+    {
+        if (_store.LoadSetup() is { Desktop: false } setup) _store.SaveSetup(setup with { Desktop = true });
+        var desk = _store.LoadDesk();
+        if (!desk.Enabled) _store.SaveDesk(desk with { Enabled = true });
+    }
+
+    /// <summary>The Desk is a built-in look nobody has changed: it is in the gallery, so it is never saved (rule A).</summary>
+    private bool OnALook(DeskDesign current) => DeskLookFit.Untouched(LookCatalog.Looks, current, FontsKnown()) is not null;
+
+    /// <summary>
+    /// Applies a ready-made look in one click (5.0 spec 5, section 5). No review bar: the bar exists to check an agent's work, and
+    /// these looks are ours. The look is fitted to this PC first, so what is written always passes the Desk's rules. Two rules keep
+    /// browsing from filling the saved designs: leaving an untouched look saves nothing (so Put my Desk back still returns to the
+    /// Desk from before the first look), and a built-in look takes no saved-design slot. The Desk is switched on if it was off;
+    /// Put my Desk back does not switch it off again.
+    /// </summary>
+    public DesignActionResult ApplyLook(string id)
+    {
+        try { return ApplyLookCore(id); }
+        catch (Exception e) when (IsRecoverable(e))
+        {
+            Log("look", e);
+            return new(false, "That did not work (" + e.GetType().Name + "). Your Desk was left as it is.");
+        }
+    }
+
+    private DesignActionResult ApplyLookCore(string id)
+    {
+        if (_disposed || ResetGuard.Done) return new(false, "Sanduhr is closing.");
+        if (LookCatalog.Find(id) is not { } look) return new(false, "That look is gone.");
+        if (DrawersReviewing()) return new(false, "Finish the drawers review on your Desk first.");
+        if (_review is not null) DismissReview();
+
+        var context = LookContext();
+        var before = context.Current!;
+        var fit = DeskLookFit.Fit(look, context);
+        bool wasOff = !DeskIsOn();
+        if (DeskLookFit.IsExactly(look, fit, before))
+        {
+            if (!wasOff) return new(true, $"{look.Name} is your Desk already.");
+            SwitchDeskOn();
+            HostApplied(null);
+            AfterChange();
+            return new(true, $"{look.Name} is on your Desk. The Desk was switched on.");
+        }
+
+        SavedDesign? saved = null;
+        if (!OnALook(before))
+        {
+            saved = SaveCurrentFirst(before, look.Name);
+            if (saved is null) return new(false, "The Desk could not be saved first, so nothing was changed.");
+        }
+        try
+        {
+            // The layout is the file's own order, each piece on the monitor the user gave it; everything else merges as any design does.
+            var merged = DeskDesign.Merge(before, fit.Design) with { Layout = [.. DeskLookFit.LayoutOver(look, before)] };
+            WriteDesign(merged, withTheme: false);
+            if (wasOff) SwitchDeskOn();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new(false, "The look could not be written (" + e.GetType().Name + ").");
+        }
+        if (saved is not null) _store.SaveDeskPutBack(saved.Id);
+        HostApplied(null);
+        AfterChange();
+        return new(true, $"{look.Name} is on your Desk." + (wasOff ? " The Desk was switched on." : ""));
+    }
+
     // -- applying and saved designs ------------------------------------------------------------------------
 
     /// <summary>
@@ -722,8 +870,13 @@ internal sealed class DeskDesignService : IDisposable
         var before = CurrentDesign();
         if (DeskDesigns.FindSame([target], before) is not null) return new(true, $"{target.Name} is your Desk already.");
 
-        var previous = SaveCurrentFirst(before, target.Name);
-        if (previous is null) return new(false, "The Desk could not be saved first, so nothing was changed.");
+        // Rule A (5.0 spec 5): an untouched built-in look is never saved, and "Put my Desk back" keeps pointing where it did.
+        SavedDesign? previous = null;
+        if (!OnALook(before))
+        {
+            previous = SaveCurrentFirst(before, target.Name);
+            if (previous is null) return new(false, "The Desk could not be saved first, so nothing was changed.");
+        }
         string? themeKey;
         try
         {
@@ -734,17 +887,21 @@ internal sealed class DeskDesignService : IDisposable
             return new(false, "The design could not be written (" + e.GetType().Name + ").");
         }
         _designs.Add(target with { AppliedAt = Clock() }, _store.LoadLauncher());
-        _store.SaveDeskPutBack(previous.Id);
+        if (previous is not null) _store.SaveDeskPutBack(previous.Id);
         HostApplied(themeKey);
         AfterChange();
         return new(true, $"Switched to {target.Name}.");
     }
 
-    /// <summary>"Put my Desk back": switches to the design saved before the last change.</summary>
+    /// <summary>"Put my Desk back": switches to the design saved before the last change. Pressed again after it returned from a
+    /// ready-made look, it changes nothing and says so.</summary>
     public DesignActionResult PutBack()
     {
-        if (_store.LoadDeskPutBack() is not { } id || _designs.Load(id) is null)
+        if (_store.LoadDeskPutBack() is not { } id || _designs.Load(id) is not { } target)
             return new(false, "There is nothing to put back yet.");
+        // Back from a look, the Desk already is the saved one (a look is never saved, so there is nothing to toggle to).
+        if (!_disposed && !ResetGuard.Done && DeskDesigns.FindSame([target], CurrentDesign()) is not null)
+            return new(true, "Your Desk is already as it was.");
         var result = SwitchTo(id);
         return result.Ok ? new(true, "Your Desk is back as it was.") : result;
     }

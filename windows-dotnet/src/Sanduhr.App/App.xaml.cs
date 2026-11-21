@@ -742,6 +742,8 @@ public partial class App : Application
         // and the request/result handoff for propose_desk (phase 1 answers not_ready; the preview is the next phase).
         _deskDesign = new Desk.DeskDesignService(paths, store, _launcherApps);
         Desk.DeskDesignService.Current = _deskDesign;
+        // A look card says "Watchers needs a watcher." while the board is empty (5.0 spec 5).
+        _deskDesign.HasWatcher = () => _watchers?.Shown.Count > 0;
         _deskDesign.Start();
         // A look per song (spec, a look per song): the gradient and letter style the Desk draws the playing song in, Claude's suggested looks
         // (the MCP tool and the now-playing mod's offer), and now-playing-look.json for the mod. The contrast rule is judged against the wallpaper.
