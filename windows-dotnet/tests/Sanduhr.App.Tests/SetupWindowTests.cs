@@ -27,6 +27,7 @@ public sealed class SetupWindowTests : AppWindowFixture
         public string? SortNow() => null;
         public void SetUsage(bool on) => UsageOn = on;
         public void ReloadDesk() { }
+        public string? ApplyLook(string id) => null;
     }
 
     private SetupViewModel Model(SettingsStore store, bool firstRun, Host? host = null) =>

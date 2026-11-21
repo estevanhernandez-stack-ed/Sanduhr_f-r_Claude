@@ -157,6 +157,7 @@ public class StreamerReachTests
         ("Sanduhr.App/Services/LauncherImages.cs", "notname", 1),
         ("Sanduhr.App/Services/ResetService.cs", "key", 1),
         ("Sanduhr.App/Services/ResetService.cs", "notname", 5),   // slice 8: the per-kind keep reads a leaf
+        ("Sanduhr.App/Services/SetupService.cs", "cant", 1),   // 5.0 desk looks: setup's picked look says a built-in look's fixed copy
         ("Sanduhr.App/Services/SetupService.cs", "key", 1),
         ("Sanduhr.App/Services/SignInCoordinator.cs", "key", 7),
         ("Sanduhr.App/Services/SignInCoordinator.cs", "masked", 2),

@@ -1243,7 +1243,8 @@ public partial class App : Application
             question => ThemedDialog.ShowConfirm(_setupWindow, SettingsNames.DrawersTurnOffTitle, question,
                 SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel));
         var model = new SetupViewModel(new SetupService(store, host), firstRun,
-            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0)   // streamer: key - a count, never drawn
+            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
+            looks: () => _deskDesign)
         { DesignWithChatRequested = OpenChatDesign };
         SetupResult? applied = null;
         model.Applied += result => applied = result;
