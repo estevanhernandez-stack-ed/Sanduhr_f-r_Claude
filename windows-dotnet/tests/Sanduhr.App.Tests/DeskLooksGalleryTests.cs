@@ -75,11 +75,11 @@ public sealed class DeskLooksGalleryTests : IDisposable
         return new WallpaperOverview(summary.Dominant, brightness, [new WallpaperMonitorSummary(0, true, 2560, 1440, summary)]);
     }
 
-    private void WithGallery(Action<DeskLooksViewModel, DeskDesignService> body) => Sta.Run(() =>
+    private void WithGallery(Action<DeskLooksViewModel, DeskDesignService> body, DeskLookCatalog? catalog = null) => Sta.Run(() =>
     {
         using var service = new DeskDesignService(_paths, _store)
         {
-            LookCatalog = Catalog,
+            LookCatalog = catalog ?? Catalog,
             InstalledFonts = () => ["Georgia", "Segoe UI"],
             Monitors = () => [],
             DrawersReviewing = () => false,
@@ -164,6 +164,41 @@ public sealed class DeskLooksGalleryTests : IDisposable
         Assert.Equal("Alpha look. A test look. Uses Segoe UI on this PC. Uses automatic ink on your wallpaper.", alpha.AccessibleName);
     });
 
+    /// <summary>A look that shows the clock, weather, the Launcher and watchers: all three needs on a PC with none set up.</summary>
+    private static readonly DeskLookCatalog NeedyCatalog = DeskLookCatalog.Load([("needy", """
+        {
+          "schema_version": 1, "id": "needy", "name": "Needy", "blurb": "Shows everything.", "font_fallback": "Segoe UI",
+          "design": {
+            "layout": {
+              "clock": { "anchor": "tc", "size": 1.3 },
+              "weather": { "anchor": "bl", "size": 1 },
+              "launcher": { "anchor": "br", "size": 1 },
+              "watchers": { "anchor": "tr", "size": 1 },
+              "message": { "hidden": true }, "claude": { "hidden": true }, "meters": { "hidden": true }, "nowPlaying": { "hidden": true },
+              "telemetry": { "hidden": true }, "glow": { "hidden": true }, "companion": { "hidden": true }
+            },
+            "font": "Georgia", "ink": "#ffd08a", "plate": false, "shadow": false, "glow": 0.7, "follows_theme": false
+          }
+        }
+        """)]);
+
+    [Fact]
+    public void Every_need_is_kept_in_order_as_one_note_and_a_fit_note_leaves_room_for_them() => WithGallery((vm, service) =>
+    {
+        Assert.Empty(NeedyCatalog.Skipped);
+        var card = vm.Cards.Single();
+        Assert.Empty(card.Notes);
+        Assert.Equal(["Weather needs a place.", "The Launcher needs buttons.", "Watchers needs a watcher."], card.Needs.Select(n => n.Text));
+        Assert.EndsWith("Weather needs a place. The Launcher needs buttons. Watchers needs a watcher.", card.AccessibleName);
+
+        service.InstalledFonts = () => ["Segoe UI"];   // one fit note, so one line is still free
+        service.FontsChanged();
+        vm.Reload();
+        card = vm.Cards.Single();
+        Assert.Equal(["Uses Segoe UI on this PC."], card.Notes);
+        Assert.Equal(3, card.Needs.Count);
+    }, NeedyCatalog);
+
     [Fact]
     public void With_no_service_the_gallery_is_empty_and_harmless() => Sta.Run(() =>
     {
@@ -245,6 +280,10 @@ public sealed class DeskLooksGalleryTests : IDisposable
         Assert.Contains("views:SettingsLinkTo.Link=\"{Binding Link}\"", panel);
         Assert.Contains("{x:Static core:SettingsNames.OnYourDesk}", panel);
         Assert.DoesNotContain("<ListBox", panel);
+        // What the shown pieces need is one note: the links flow on one wrapping line, not a row each.
+        int needs = panel.IndexOf("ItemsSource=\"{Binding Needs}\"", StringComparison.Ordinal);
+        Assert.True(needs > 0);
+        Assert.Contains("<WrapPanel", panel[needs..panel.IndexOf("</ItemsControl>", needs, StringComparison.Ordinal)]);
 
         // On the Desk page, under the Desk switch and above Arrange and the pieces; greyed while Arrange Desk runs.
         int desk = window.IndexOf("views:SettingsAnchor.Id=\"desk\"", StringComparison.Ordinal);

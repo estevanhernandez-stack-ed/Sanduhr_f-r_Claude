@@ -108,9 +108,15 @@
                                     <Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
                                 </Style>
                             </ItemsControl.ItemContainerStyle>
+                            <!-- One note: every need as a link, flowing on one wrapping line inside the card's width. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left"
+                                    <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left" Margin="0,0,8,0"
                                             Content="{Binding Text}" views:SettingsLinkTo.Link="{Binding Link}"
                                             AutomationProperties.Name="{Binding Text}" />
                                 </DataTemplate>
