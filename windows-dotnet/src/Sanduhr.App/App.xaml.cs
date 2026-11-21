@@ -763,7 +763,13 @@ public partial class App : Application
         _drawers.TidyRequested = id => TidyDrawers(null, _desk?.MonitorOf(id));
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
-        _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
+        _deskDesign.DesignsChanged += () =>
+        {
+            _settingsWindow?.ViewModel.Desk.Designs.Reload();
+            _settingsWindow?.ViewModel.Desk.Looks.Reload();
+        };
+        // The wallpaper, the monitors or the fonts changed: the look cards are fitted and drawn again, on the UI thread.
+        _deskDesign.LooksChanged += () => Dispatcher.BeginInvoke(new Action(() => _settingsWindow?.ViewModel.Desk.Looks.Reload()));
         // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
         _widgetReview = new Desk.WidgetReviewService(paths, store);
         Desk.WidgetReviewService.Current = _widgetReview;

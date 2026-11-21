@@ -188,6 +188,7 @@ public class StreamerReachTests
         ("Sanduhr.App/ViewModels/ClaudeCodeViewModel.cs", "masked", 5),
         ("Sanduhr.App/ViewModels/DesignsSettingsViewModel.cs", "cant", 1),
         ("Sanduhr.App/ViewModels/DeskCompanionViewModel.cs", "notname", 1),
+        ("Sanduhr.App/ViewModels/DeskLooksViewModel.cs", "cant", 1),
         ("Sanduhr.App/ViewModels/DeskSettingsViewModel.cs", "notname", 2),
         ("Sanduhr.App/ViewModels/FolderHoldsViewModel.cs", "key", 3),
         ("Sanduhr.App/ViewModels/FolderHoldsViewModel.cs", "masked", 3),

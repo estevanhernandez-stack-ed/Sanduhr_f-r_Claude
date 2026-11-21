@@ -204,4 +204,21 @@ public class SettingsIndexTests
         Assert.Equal(SettingsPage.Mods, SettingsIndex.Search("widgets")[0].Entry.Page);
         Assert.Contains((SettingsNames.WidgetCatalogCheck, SettingsPage.Mods), SettingsNames.Table);
     }
+
+    [Fact]
+    public void The_Desk_pages_first_jump_link_is_Looks()
+    {
+        var links = SettingsIndex.JumpLinks(SettingsPage.Desk);
+        Assert.Equal((SettingsNames.LooksSection, SettingsIndex.DeskLooks), links[0]);
+        Assert.Equal(5, links.Count);
+    }
+
+    [Theory]
+    [InlineData("looks")]
+    [InlineData("gallery")]
+    [InlineData("presets")]
+    [InlineData("styles")]
+    [InlineData("Marquee")]
+    public void Search_finds_the_looks(string query) =>
+        Assert.Contains(SettingsIndex.Search(query), h => h.Entry.Page == SettingsPage.Desk && h.Entry.Anchor == SettingsIndex.DeskLooks);
 }

@@ -40,7 +40,7 @@ public class SettingsDeskSplitIndexTests
     [Fact]
     public void The_Desks_jump_links_read_as_the_spec_writes_them()
     {
-        Assert.Equal(["Pieces", "Behavior", "Designs", "Advanced"], SettingsIndex.JumpLinks(SettingsPage.Desk).Select(l => l.Title));
+        Assert.Equal(["Looks", "Pieces", "Behavior", "Designs", "Advanced"], SettingsIndex.JumpLinks(SettingsPage.Desk).Select(l => l.Title));
         Assert.Empty(SettingsIndex.JumpLinks(SettingsPage.Weather));
     }
 
@@ -272,7 +272,7 @@ public class SettingsDeskSplitIndexTests
     public void The_Desk_page_runs_in_the_specs_order()
     {
         var marks = Regex.Matches(TabRange("Desk"), "views:SettingsAnchor\\.Id=\"([\\w-]+)\"").Select(m => m.Groups[1].Value).ToList();
-        Assert.Equal(["desk", "arrange", "design-with-chat", "map", "pieces", "desk-clicks", "signin-reminders", "desk-designs", "desk-advanced", "margins", "desk-oled"], marks);
+        Assert.Equal(["desk", "looks", "arrange", "design-with-chat", "map", "pieces", "desk-clicks", "signin-reminders", "desk-designs", "desk-advanced", "margins", "desk-oled"], marks);
         Assert.DoesNotContain("signin-reminders", TabRange("Alerts"));
     }
 

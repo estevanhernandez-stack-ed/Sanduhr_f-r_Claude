@@ -1126,6 +1126,11 @@ public static class SettingsNames
     /// <summary>Now playing's first jump link (its section is "Show what's playing in the widget").</summary>
     public const string NowPlayingJumpWidget = "In the widget";
 
+    /// <summary>Desk: the ready-made looks section (5.0 spec 5).</summary>
+    public const string LooksSection = "Looks";
+    public const string LooksRowName = "Ready-made looks";
+    public const string OnYourDesk = "On your Desk";
+    public const string LooksCaption = "Pick one and your whole Desk changes. Put my Desk back undoes it. Your Launcher buttons, your messages and your weather place stay as they are.";
     /// <summary>Desk: the piece rows' section (was "Where each piece sits").</summary>
     public const string PiecesSection = "Pieces";
     /// <summary>Desk: the clicks switch and the sign-in reminders.</summary>

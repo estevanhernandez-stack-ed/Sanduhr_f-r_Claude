@@ -97,6 +97,8 @@ public static class SettingsIndex
     public const string Installed = "installed";
     // Desk
     public const string DeskOn = "desk";
+    /// <summary>Desk, Looks (5.0 spec 5): six ready-made looks; the page's first section after the switch.</summary>
+    public const string DeskLooks = "looks";
     public const string DeskPieces = "pieces";
     public const string DeskLook = "look";
     public const string DeskMargins = "margins";
@@ -286,6 +288,9 @@ public static class SettingsIndex
 
         E(SettingsNames.DeskSwitch, SettingsPage.Desk, DeskOn,
             ["desktop", "wallpaper", "clock", "meters", "Rainmeter", "show the Desk", "on the desktop", "off by default", "monitors"]),
+        E(SettingsNames.LooksSection, SettingsPage.Desk, DeskLooks,
+            ["looks", "look", "gallery", "presets", "preset", "styles", "style", "ready-made", "templates", "skins",
+             "Quiet corner", "Ice", "Marquee", "Terminal", "Editorial", "Dashboard", SettingsNames.PutMyDeskBack, "one click", "neon"]),
         E(SettingsNames.ArrangeDesk, SettingsPage.Desk, DeskArrange,
             ["drag", "move", "rearrange", "arrange", "reorder", "on the desktop", "layout", "arrow keys", "keyboard"]),
         E(SetupCopy.DesignWithChat, SettingsPage.Desk, DeskDesignWithChat,
@@ -905,7 +910,7 @@ public static class SettingsIndex
         // About (slice 6): six sections once Updates joins (slice 5 carry P5). The labels are the index titles (owner taste 9), but
         // Reset's is the section's name: the entry's own title is the command (preflight P15).
         SettingsPage.About => [.. Links(page, Version, Updates, Trademark, Where), (SettingsNames.ResetJump, Reset), .. Links(page, Notices)],
-        SettingsPage.Desk => Links(page, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
+        SettingsPage.Desk => Links(page, DeskLooks, DeskPieces, DeskClicks, DeskDesigns, DeskAdvanced),
         SettingsPage.Drawers => Links(page, DrawersSort, DrawersRules, DrawersList, DrawersRecent),
         SettingsPage.DeskLook => Links(page, DeskThemeMatch, DeskLook, DeskSizes, DeskInk, DeskPlate),
         // The first is named for the widget it sits in; the others read as their index rows.

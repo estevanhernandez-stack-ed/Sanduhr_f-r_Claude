@@ -147,6 +147,9 @@ internal sealed class DeskDesignService : IDisposable
     /// <summary>The saved designs or "Put my Desk back" changed (Settings and the tray follow).</summary>
     public event Action? DesignsChanged;
 
+    /// <summary>What a look card shows may have changed without a design changing: the wallpaper, the monitors or the installed fonts.</summary>
+    public event Action? LooksChanged;
+
     /// <summary>A design is on the desktop waiting for Apply or Dismiss.</summary>
     public bool Reviewing => _review is not null;
 
@@ -195,10 +198,18 @@ internal sealed class DeskDesignService : IDisposable
 
     private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e)
     {
-        if (e.Category is UserPreferenceCategory.Desktop or UserPreferenceCategory.Color) Refresh();
+        if (e.Category is UserPreferenceCategory.Desktop or UserPreferenceCategory.Color)
+        {
+            Refresh();
+            LooksChanged?.Invoke();
+        }
     }
 
-    private void OnDisplayChanged(object? sender, EventArgs e) => Refresh();
+    private void OnDisplayChanged(object? sender, EventArgs e)
+    {
+        Refresh();
+        LooksChanged?.Invoke();
+    }
 
     private void OnFontsChanged(object? sender, EventArgs e) => _ui.BeginInvoke(FontsChanged);
 
@@ -208,6 +219,7 @@ internal sealed class DeskDesignService : IDisposable
     {
         _fonts = null;
         Refresh();
+        LooksChanged?.Invoke();
         if (_review is not null && !_disposed) ShowReview();
     }
 
