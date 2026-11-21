@@ -47,7 +47,10 @@ struct SetupStorage {
             loadSetup: { SetupStore.load(from: setup) },
             deskEnabled: { desk.bool(forKey: DeskController.enabledKey) },
             save: { settings, deskRuns in
+                let codexWasOn = SetupStore.load(from: setup)?.codexUsage ?? false
                 SetupStore.save(settings, to: setup)
+                // Codex switched on again: a record erased while it was on starts again.
+                if settings.codexUsage, !codexWasOn { VaultAgentStop.clear(.codex, in: setup) }
                 if desk.bool(forKey: DeskController.enabledKey) != deskRuns { desk.set(deskRuns, forKey: DeskController.enabledKey) }
             })
     }

@@ -10,8 +10,16 @@ enum UsagePageLoader {
     static func overview(_ source: UsageSource, names: ProjectNamesChoice, live: CCLogReader?,
                          vault: VaultReader, now: Date = Date(), calendar: Calendar = .current,
                          displayName: @escaping (String) -> String = CCProjectName.displayName) -> UsageOverview? {
-        guard source.folder != nil, let live else { return nil }
         let today = CCLocalDay(now, calendar: calendar)
+        let agents = agentWindows(vault: vault, today: today)
+        guard source.folder != nil, let live else {
+            // No Claude Code folder to read: only an agent's rows, when it has any.
+            guard !agents.isEmpty else { return nil }
+            var o = UsageOverview.build(today: today, now: now, calendar: calendar, live: [:], record: nil,
+                                        agents: agents, name: { $0 })
+            o.mode = .agentsOnly
+            return o
+        }
         let start = UsageOverview.windowStart(today)
         let liveDays = live.days(from: start, calendar: calendar)
         var facts: UsageRecordFacts?
@@ -24,7 +32,8 @@ enum UsagePageLoader {
             facts = f
         }
         var named: [String: String] = [:]
-        return UsageOverview.build(today: today, now: now, calendar: calendar, live: liveDays, record: facts) { cwd in
+        return UsageOverview.build(today: today, now: now, calendar: calendar, live: liveDays, record: facts,
+                                   agents: agents) { cwd in
             if let hit = named[cwd] { return hit }
             let n = UsageProjectNames.name(cwd, choice: names, displayName: displayName)
             named[cwd] = n
@@ -40,9 +49,21 @@ enum UsagePageLoader {
         return UsageTrends.build(weeks: list, top: top, birth: vault.birthDate([id]), today: today)
     }
 
-    /// Every logical session in the record.
-    static func sessions(recordID id: String, vault: VaultReader) -> [VaultSessionInfo] {
-        vault.readSessions([id])
+    /// The 30-day window of each agent root that has a record and tokens in it. Agents belong to
+    /// no account, so they join every account's view (Windows combines them in the totals).
+    static func agentWindows(vault: VaultReader, today: CCLocalDay) -> [AgentSource: VaultWindow] {
+        var out: [AgentSource: VaultWindow] = [:]
+        for agent in vault.agentRoots() {
+            let w = vault.readWindow([agent.rawValue], from: UsageOverview.windowStart(today),
+                                     toExclusive: today.adding(days: 1))
+            if w.total > 0 { out[agent] = w }
+        }
+        return out
+    }
+
+    /// Every logical session in the record, and in every agent root that has one.
+    static func sessions(recordID id: String?, vault: VaultReader) -> [VaultSessionInfo] {
+        vault.readSessions((id.map { [$0] } ?? []) + vault.agentRoots().map(\.rawValue))
     }
 
     /// What the CSV's `root` column and the expansion call the record: the linked folder's name

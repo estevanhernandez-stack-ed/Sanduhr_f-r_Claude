@@ -297,6 +297,11 @@ faint outline, the OLED-friendly one).
 - A style is the piece's own (the tilt stays the stack's). Nothing animates. Settings ▸ Desk gets a
   Style picker under each of those pieces' places; `propose_desk` refuses a style on any other piece
   or an unknown word.
+- Which source a usage piece draws (2.46, agent sources item 8): a `src=` field on `claude` and `meters`,
+  `combined` (default), `claude` or `codex`, written wherever after the other fields and before `@display`
+  (`meters:tr:1:0:ring:src=codex@all`) and never for Combined, so every older word reads and writes as it
+  did. Settings ▸ Desk and Arrange offer Shows only while Codex is on; `propose_desk` takes `source` on those
+  two pieces and `get_desk` reports it with `limits.piece_source`. With one source on every piece draws as before.
 
 ## 11. Font packs
 

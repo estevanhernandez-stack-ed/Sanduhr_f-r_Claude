@@ -30,9 +30,9 @@ tools the same way on either machine:
   propose_config             hands agents, skills, commands, output styles, settings keys and MCP
                              servers for one Claude Code folder to Sanduhr, which opens them for the
                              user to import or dismiss, under the same switch
-  get_desk                   the Desk as it is: layout words with tilt and style, ink, plate, shadow, font,
+  get_desk                   the Desk as it is: layout words with tilt, style and source, ink, plate, shadow, font,
                              the pieces shown, and the limits a design must keep (from desk-state.json)
-  propose_desk               suggests a whole Desk design (layout, tilt, style, font, ink, plate, shadow);
+  propose_desk               suggests a whole Desk design (layout, tilt, style, source, font, ink, plate, shadow);
                              checked here with the app's own rules, then previewed in Settings, Desk and
                              applied only when the user presses Apply (no switch lets Claude skip that)
   propose_widget             builds a sprite, palette or effects pack from data (no PNG, no font),
@@ -83,12 +83,14 @@ import unicodedata
 import uuid
 from datetime import datetime, timedelta, timezone
 
-SERVER_VERSION = "0.5.0-mac"
+SERVER_VERSION = "0.6.0-mac"
 PROTOCOL_VERSION = "2025-06-18"
 SCHEMA_VERSION = 1
 ACCESS_SCHEMA_VERSION = 1
 FRESH_SECONDS = 450
 DEAD_SECONDS = 900
+# Codex's limits are fresh for 30 minutes of Codex idle time by captured_at (the widget's rule).
+CODEX_FRESH_SECONDS = 1800
 DATA_LAG_NOTE = "claude.ai's own numbers lag consumption by several minutes"
 BURN_CAVEAT = (
     "token-count proxy from local Claude Code logs (input+output only, cache excluded); "
@@ -418,6 +420,7 @@ DESIGN_GUIDE_READ = (
     "layout with every piece's anchor, size, hidden, monitor (\"main\", \"all\" or a display id) and tilt (the slant "
     "of its stack in degrees, 0 upright), and "
     "for claude, meters and telemetry its style (bar, slim, ring or ticks; limits.piece_style lists the pieces and "
+    "the words), for claude and meters its source (combined, claude or codex; limits.piece_source lists the pieces and "
     "the words), weather.nickname (the name the weather piece shows instead of the place's, \"\" for the place's own), "
     "font, ink, plate, shadow), pieces and anchors (the allowed words), monitors (each display: id, name, width, "
     "height, primary, left, top; the Desk places pieces per display), fonts (installed families, and the "
@@ -445,7 +448,10 @@ DESIGN_GUIDE_PROPOSE = (
     "(the default, a full-width bar with its label above), slim (label and value on one line over a thin bar, about "
     "half the height; claude becomes a compact two-row line), ring (small arc gauges with the value inside, side by "
     "side in a row), ticks (ten segmented cells, the OLED-friendly one); a Claude limit keeps its pace mark in every "
-    "style; font (a family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, "
+    "style; source in a layout piece, only on claude and meters, is which agent the piece shows once the user has "
+    "turned Codex on: combined (the default, every source that is on in one two-tone bar), claude or codex (that "
+    "source's own limits); a design that names no source leaves each piece's own, and with only Claude on every "
+    "piece draws as it always has; font (a family from get_desk fonts.installed or the bundled EsteFont Pro or EsteFont 26, or {family, "
     "link} with an https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link "
     "and Apply waits for the font, status needs_font); ink (one #rrggbb, or a list of 2 to 4 #rrggbb for a "
     "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of "
@@ -478,7 +484,10 @@ TOOLS = [
             "not be the account this session bills to - confirm with the user if they run multiple "
             "accounts. Answers only when the user shares that account with "
             "Claude in Sanduhr. A stale, no_data or not_shared result means unknown headroom - "
-            "never assume budget."),
+            "never assume budget. When the user has Codex switched on in Sanduhr, a separate "
+            "`codex` block carries Codex's own 5-hour and weekly limits in the same tier shape "
+            "(as_of, stale, plan); it is independent of Claude's status and absent when Codex "
+            "has no reading."),
         "inputSchema": NO_ARGS,
         "annotations": READ_ONLY,
     },
@@ -490,7 +499,12 @@ TOOLS = [
             "are a proxy (input+output, cache excluded) and are NOT convertible to quota "
             "percentages; use get_usage for headroom. Scoped to the accounts the user shares "
             "activity for in Sanduhr; every response names the accounts it covered. Project "
-            "names follow each account's choice: Hidden returns a short code per project."),
+            "names follow each account's choice: Hidden returns a short code per project. "
+            "When the user has also switched on 'Let Claude read Codex's (or Antigravity's) "
+            "project totals' in Sanduhr, an `agents` list carries that agent's total and "
+            "projects over whole local days from `agents_from` (read from Sanduhr's record, "
+            "so as fresh as its last ingest); an agent without that consent is never read "
+            "and `agents` is absent."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -828,7 +842,7 @@ TOOLS += [
                         "name": {"type": "string", "maxLength": 40},
                         "note": {"type": "string", "maxLength": 200},
                         "layout": {"type": "object",
-                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: main|all|a display id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry}."},
+                                   "description": "Piece key (from get_desk pieces) to {anchor: tl|tc|tr|ml|mr|bl|bc|br, size: 0.6-1.6, hidden: boolean, monitor: main|all|a display id from get_desk monitors, tilt: -20 to 20 degrees, the slant of the piece's whole stack, style: bar|slim|ring|ticks, only on claude, meters and telemetry, source: combined|claude|codex, only on claude and meters}."},
                         "weather": {"type": "object",
                                     "description": "{nickname: up to 24 characters}: the name the weather piece shows instead of the place's own; \"\" goes back to the place's name. Local only; the forecast keeps the city's coordinates.",
                                     "properties": {"nickname": {"type": "string", "maxLength": 24}},
@@ -992,6 +1006,9 @@ class Paths:
         named = snapshot or os.environ.get("SANDUHR_SNAPSHOT")
         self.snapshot_named = bool(named)
         self.snapshot = named or os.path.join(self.support_dir, "snapshot.json")
+        # Codex's snapshot sits beside the Claude one, a named snapshot's folder included.
+        self.codex_snapshot = os.path.join(
+            os.path.dirname(os.path.abspath(named)) if named else self.support_dir, "snapshot.codex.json")
         self.access = os.path.join(self.support_dir, "mcp-access.json")
         self.vault = os.path.join(self.support_dir, "vault")
         # Desk's folder sits beside Sanduhr's (Application Support/Desk), so a test folder moves
@@ -1082,6 +1099,10 @@ def no_data(reason, remedy):
 REF_RE = re.compile(r"^[0-9a-f]{8}$")
 VAULT_ID_RE = re.compile(r"^[0-9a-f]{16}$")
 HISTORY_RE = re.compile(r"^history\.[^/\\\x00]+\.json$")
+# The agents whose Vault roots (`vault/<name>`) Claude may read when the access file's `agents` object
+# switches them on (item 13). These fixed names are the only Vault root names that are not a 16-digit
+# hex vault id; nothing else may bypass VAULT_ID_RE.
+AGENT_ROOTS = ("codex", "antigravity")
 
 
 class Account:
@@ -1152,6 +1173,24 @@ def read_access(paths):
         seen.add(ref)
         out.append(Account(ref, row.get("active") is True, share, hist, names, vault_id, folder))
     return "ok", out
+
+
+def read_agents(paths):
+    """The agents the access file consents to, in AGENT_ROOTS order. A file without `agents`, an
+    unreadable one, a newer schema, and any value that is not exactly true all read as off; names
+    outside AGENT_ROOTS are never roots."""
+    try:
+        with open(paths.access, encoding="utf-8") as f:
+            doc = json.loads(f.read())
+    except (OSError, UnicodeDecodeError, ValueError):
+        return []
+    if not isinstance(doc, dict) or doc.get("schema_version") != ACCESS_SCHEMA_VERSION \
+            or isinstance(doc.get("schema_version"), bool):
+        return []
+    agents = doc.get("agents")
+    if not isinstance(agents, dict):
+        return []
+    return [name for name in AGENT_ROOTS if agents.get(name) is True]
 
 
 def not_shared(status):
@@ -1488,6 +1527,9 @@ def project_name_of(key):
 def read_vault_window(paths, vault_ids, first, last):
     by_day, by_in, by_out, by_project = {}, {}, {}, {}
     for vid in vault_ids:
+        # A vault id is 16 hex digits; the agents' fixed root names are the one allowlisted exception.
+        if not (VAULT_ID_RE.match(vid) or vid in AGENT_ROOTS):
+            continue
         for month in months_between(first, last):
             doc = read_json(os.path.join(paths.vault, vid, "rollups-%s.json" % month))
             days = doc.get("days") if isinstance(doc, dict) else None
@@ -1543,8 +1585,49 @@ def read_meter_history(paths, account, first, last):
 # -- tools -------------------------------------------------------------------------------
 
 def build_usage(now=None, paths=None, env=None):
+    """Claude's usage plus, when snapshot.codex.json reads, the independent `codex` block: Codex
+    shows whatever state Claude's side is in (not shared, missing, stale), as on Windows. No file,
+    no `codex` key, so a Claude-only answer is the one it always was."""
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
+    result = build_claude_usage(now, paths, env)
+    codex = build_codex_block(now, paths)
+    if codex is not None:
+        result["codex"] = codex
+    return result
+
+
+def build_codex_block(now, paths):
+    """Codex's limits from snapshot.codex.json in the tier shape, or None (no key at all) when the
+    file is missing, unreadable, a newer schema or carries no readable captured_at: Codex is an
+    extra, never the thing whose absence is an error. `stale` is past 30 minutes by captured_at (the
+    Codex event's own time, so it counts Codex idle time, not Claude's 450 s) or a file in error."""
+    outcome, snap = read_snapshot(paths, paths.codex_snapshot)
+    if outcome != "ok":
+        return None
+    try:
+        if int(snap.get("schema_version")) > SCHEMA_VERSION:
+            return None
+    except (TypeError, ValueError):
+        return None
+    captured = parse(snap.get("captured_at"))
+    if captured is None:
+        return None
+    age = round(max(0.0, (now - captured).total_seconds()))
+    stale = age >= CODEX_FRESH_SECONDS or snap.get("status") == "error"
+    tiers = [build_tier(t["key"], t, now) for t in snap.get("tiers") or []
+             if isinstance(t, dict) and isinstance(t.get("key"), str) and t["key"]]
+    return {
+        "status": "stale" if stale else "ok",
+        "stale": stale,
+        "as_of": snap.get("captured_at"),
+        "age_seconds": age,
+        "plan": snap.get("plan"),
+        "tiers": tiers,
+    }
+
+
+def build_claude_usage(now, paths, env=None):
     access, accounts = read_access(paths)
     if access != "ok" or not accounts:
         return not_shared(access if access != "ok" else "none")
@@ -1621,10 +1704,13 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
     now = now or datetime.now(timezone.utc)
     paths = paths or Paths()
     access, accounts = read_access(paths)
-    if access != "ok" or not accounts:
-        return not_shared(access if access != "ok" else "none")
+    if access != "ok":
+        return not_shared(access)
+    consented = read_agents(paths)
+    if not accounts and not consented:
+        return not_shared("none")
     scanned = activity_accounts(accounts)
-    if not scanned:
+    if not scanned and not consented:
         return no_data("disabled", REMEDY_NO_ACTIVITY)
     since = now - timedelta(days=window_days)
     files = [0]
@@ -1644,7 +1730,7 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
             "total_tokens": total,
             "projects": [{"name": n, "tokens": t} for n, t in sorted(by_project.items(), key=lambda p: -p[1])],
         })
-    return {
+    result = {
         "status": "ok",
         "reason": None,
         "remedy": None,
@@ -1653,9 +1739,32 @@ def build_burn(window_days=7, full_paths=False, now=None, paths=None, dir_holds_
         "full_paths": bool(full_paths),
         "roots_scanned": [a.ref for a in scanned],
         "roots": roots,
-        "files_scanned": files[0],
-        "caveat": BURN_CAVEAT,
     }
+    if consented:
+        result.update(build_agent_totals(paths, consented, window_days, now))
+    result["files_scanned"] = files[0]
+    result["caveat"] = BURN_CAVEAT + (AGENT_CAVEAT if consented else "")
+    return result
+
+
+def build_agent_totals(paths, consented, window_days, now):
+    """The `agents` list for get_local_burn_by_project: each consented agent's project totals from
+    its Vault rollups over whole local days (today and the window_days - 1 before it, the span
+    Windows reads), largest project first. Only called with consented names."""
+    today = local_date(now)
+    first = today - timedelta(days=window_days - 1)
+    agents = []
+    for name in consented:
+        _, _, _, by_project = read_vault_window(paths, [name], first, today)
+        agents.append({
+            "agent": name,
+            "total_tokens": sum(by_project.values()),
+            "projects": [{"name": n, "tokens": t} for n, t in sorted(by_project.items(), key=lambda p: (-p[1], p[0]))],
+        })
+    return {"agents_scanned": list(consented), "agents_from": first.isoformat(), "agents": agents}
+
+
+AGENT_CAVEAT = " Agent totals come from the Vault and are as fresh as the widget's last ingest."
 
 
 def build_model_usage(window_days=7, now=None, paths=None):
@@ -3902,6 +4011,9 @@ DESIGN_PIECES = ("message", "clock", "claude", "meters", "nowPlaying", "telemetr
 DESIGN_ANCHORS = ("tl", "tc", "tr", "ml", "mr", "bl", "bc", "br")
 DESIGN_STYLE_PIECES = ("claude", "meters", "telemetry")
 DESIGN_STYLES = ("bar", "slim", "ring", "ticks")
+# Which source a usage piece draws (2.46, agent sources): the Claude line and the Claude limits, as Windows' DeskSources.
+DESIGN_SOURCE_PIECES = ("claude", "meters")
+DESIGN_SOURCES = ("combined", "claude", "codex")
 DESIGN_MIN_SCALE = 0.6
 DESIGN_MAX_SCALE = 1.6
 DESIGN_SCALE_STEP = 0.1
@@ -4061,7 +4173,7 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
     if node is None:
         return None
     if not isinstance(node, dict):
-        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style}"))
+        reasons.append(design_reason("layout", "must be an object of piece name to {anchor, size, hidden, monitor, tilt, style, source}"))
         return None
     if len(node) > DESIGN_MAX_PIECES:
         reasons.append(design_reason("layout", "names %d pieces; the Desk has %d" % (len(node), len(DESIGN_PIECES))))
@@ -4077,10 +4189,10 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
                 reasons.append(design_reason(field, "is not a Desk piece; the pieces are " + ", ".join(DESIGN_PIECES)))
             continue
         if not isinstance(value, dict):
-            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, monitor, tilt and style"))
+            reasons.append(design_reason(field, "must be an object with anchor, size, hidden, monitor, tilt, style and source"))
             continue
-        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "monitor", "tilt", "style")), key=u16)[:3]:
-            reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, monitor, tilt and style" % design_clip(bad, 20)))
+        for bad in sorted((k for k in value if k not in ("anchor", "size", "hidden", "monitor", "tilt", "style", "source")), key=u16)[:3]:
+            reasons.append(design_reason(field, "unknown member '%s'; use anchor, size, hidden, monitor, tilt, style and source" % design_clip(bad, 20)))
         anchor = None
         if value.get("anchor") is not None:
             word = design_str(value["anchor"])
@@ -4124,10 +4236,21 @@ def design_parse_layout(node, reasons, monitors=None, current=None):
                     style = word.strip().lower()
                 else:
                     reasons.append(design_reason(field + ".style", "must be one of " + ", ".join(DESIGN_STYLES)))
+        source = None
+        if value.get("source") is not None:
+            # A source only on a piece that takes one: a clock with a source is a mistake, not a no-op.
+            if key not in DESIGN_SOURCE_PIECES:
+                reasons.append(design_reason(field + ".source", "only " + ", ".join(DESIGN_SOURCE_PIECES) + " take a source"))
+            else:
+                word = design_str(value["source"])
+                if word is not None and word.strip().lower() in DESIGN_SOURCES:
+                    source = word.strip().lower()
+                else:
+                    reasons.append(design_reason(field + ".source", "must be one of " + ", ".join(DESIGN_SOURCES)))
         if hidden is True:
-            anchor = size = tilt = style = monitor = None
+            anchor = size = tilt = style = monitor = source = None
         pieces.append({"piece": key, "anchor": anchor, "size": size, "hidden": hidden, "tilt": tilt, "style": style,
-                       "monitor": monitor})
+                       "monitor": monitor, "source": source})
     # One slant per stack: two pieces sent to the same anchor of one display with different tilts cannot both be
     # honored. A piece that names no monitor keeps the display it is on now.
     groups = {}
@@ -4323,6 +4446,8 @@ def design_to_json(d):
                 po["style"] = p["style"]
             if p.get("monitor") is not None:
                 po["monitor"] = p["monitor"]
+            if p.get("source") is not None:
+                po["source"] = p["source"]
             lo[p["piece"]] = po
         o["layout"] = lo
     if d.get("weather_nickname") is not None:

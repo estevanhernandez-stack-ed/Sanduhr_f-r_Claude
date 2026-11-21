@@ -1,0 +1,267 @@
+{
+  "run": "mac-agent-sources-2-46",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "4a205621a78a0aa1c30c565f4151282238bc6b5e",
+  "integration_branch": "cart/mac-agent-sources-2-46",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-mac-agent-sources-2-46/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-mac-agent-sources-2-46",
+  "builder_branch": "main",
+  "uncommitted_at_start": [
+    "docs/superpowers/specs/2026-11-19-mac-agent-sources-design.md"
+  ],
+  "started_at": "2026-11-20T16:21:43.435Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "zstd-decoder",
+      "title": "zstd-decoder",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--01-zstd-decoder",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "agent-source-model",
+      "title": "agent-source-model",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--02-agent-source-model",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "codex-limits-reader",
+      "title": "codex-limits-reader",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--03-codex-limits-reader",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "codex-history-snapshot-alerts",
+      "title": "codex-history-snapshot-alerts",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--04-codex-history-snapshot-alerts",
+      "worktree": "",
+      "on": 3,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "source-bar",
+      "title": "source-bar",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--05-source-bar",
+      "worktree": "",
+      "on": 2,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "widget-sources",
+      "title": "widget-sources",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--06-widget-sources",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "settings-sources-menubar",
+      "title": "settings-sources-menubar",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--07-settings-sources-menubar",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "desk-meter-source",
+      "title": "desk-meter-source",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--08-desk-meter-source",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 9,
+      "slug": "statusline-mcp-usage",
+      "title": "statusline-mcp-usage",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--09-statusline-mcp-usage",
+      "worktree": "",
+      "on": 4,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 10,
+      "slug": "vault-agent-roots-codex-burn",
+      "title": "vault-agent-roots-codex-burn",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--10-vault-agent-roots-codex-burn",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 11,
+      "slug": "antigravity-burn",
+      "title": "antigravity-burn",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--11-antigravity-burn",
+      "worktree": "",
+      "on": 10,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 12,
+      "slug": "local-burn-views",
+      "title": "local-burn-views",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--12-local-burn-views",
+      "worktree": "",
+      "on": 11,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh (x2 full, x6 filtered)",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 13,
+      "slug": "mcp-agents-consent",
+      "title": "mcp-agents-consent",
+      "stop_class": "hold",
+      "status": "held",
+      "branch": "cart/mac-agent-sources-2-46--13-mcp-agents-consent",
+      "worktree": "~/.cwt/sanduhr-f-r-clau-mac-agent-sources-2-46/13",
+      "on": 12,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": "Adds an access-consent switch (Claude reading agent project totals through the MCP); permissions class, held for the owner's walkthrough"
+    },
+    {
+      "n": 14,
+      "slug": "rows-2-46",
+      "title": "rows-2-46",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-sources-2-46--14-rows-2-46",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

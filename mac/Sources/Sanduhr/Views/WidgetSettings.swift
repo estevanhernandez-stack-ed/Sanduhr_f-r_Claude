@@ -362,6 +362,7 @@ struct WidgetSettings: View {
                 Toggle("When the session resets", isOn: $alertSessionReset)
                 Toggle("When a weekly limit resets", isOn: $alertWeeklyReset)
                 Toggle("Warn when I'm on pace to run out before the reset", isOn: $alertPace)
+                CodexAlertsToggle(t: t)
 
                 Divider()
 

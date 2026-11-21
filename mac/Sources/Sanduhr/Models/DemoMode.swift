@@ -51,6 +51,17 @@ enum DemoMode {
                                      .sevenDaySonnet: tier(18, resetsIn: 4 * 86_400)])
     }
 
+    /// Made-up Codex limits for demo mode's sample Codex section (agent sources design, section 3):
+    /// the two windows Codex reports, in Claude's tier shape, reset times counting from `now`. The
+    /// widget shows them fresh, as of now; nothing reads `~/.codex`.
+    static func codexUsage(now: Date = Date()) -> UsageResponse {
+        func tier(_ util: Double, resetsIn seconds: TimeInterval) -> TierUsage {
+            TierUsage(utilization: util, resetsAt: ISO8601.stamp(now.addingTimeInterval(seconds), fractional: false))
+        }
+        return UsageResponse(tiers: [.fiveHour: tier(27, resetsIn: 3 * 3600),
+                                     .sevenDay: tier(71, resetsIn: 3 * 86_400)])
+    }
+
     /// What the Desk is handed in demo mode: the sample numbers, fresh, named by the account
     /// (two accounts, so the Claude line starts with the name).
     static func deskUsage(for account: String, now: Date = Date()) -> DeskUsage {

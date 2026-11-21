@@ -15,6 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static var resetSweep: (() -> Void)?
 
     let viewModel = UsageViewModel()
+    /// Codex's limits from its own rollouts (agent sources, item 3): polls only while Codex is ticked
+    /// in the setup and demo mode is off. Nothing draws it yet.
+    let codexUsage = CodexUsageService()
+    /// What the widget needs about sources beyond the view model (WidgetSources).
+    let widgetSources = WidgetSourcesState()
+    /// Codex's history, `snapshot.codex.json` and alerts (item 4), fed by the service's readings.
+    private let codexRecorder = CodexRecorder()
     private var panel: FloatingPanel?
     private var statusItem: NSStatusItem?
     /// Rotate's timer (Settings, General, Menu bar), nil in every other mode; the step counts its turns.
@@ -73,7 +80,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastUsageOn = viewModel.usageOn
 
         // Build widget panel.
-        let hosting = NSHostingController(rootView: RootView(vm: viewModel))
+        let hosting = NSHostingController(rootView: RootView(vm: viewModel, sources: widgetSources, codex: codexUsage))
         hosting.view.wantsLayer = true
         hosting.view.layer?.cornerRadius = 14
         hosting.view.layer?.masksToBounds = true
@@ -118,8 +125,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The lock screen line (#137): keeps lock-line.txt current while its switch is on.
         LockLineController.shared.start(viewModel: viewModel)
 
+        // Codex polls while its source is on; a setup change or demo mode flipping re-decides. What a
+        // reading leaves behind (history, snapshot, alerts) is the recorder's; a Mac with only Claude on
+        // never starts the service, so neither callback ever runs there.
+        codexUsage.onUpdate = { [weak self] in
+            self?.codexRecorder.record($0)
+            self?.syncDeskSources()
+            self?.fitPanelToContent()
+            self?.renderStatusItem()   // the menu bar follows Primary, so a Codex reading can change it
+            self?.triggerCodexIngest()
+        }
+        codexUsage.onStop = { [weak self] in
+            let on = AgentSourceSettings.load().isOn(.codex, setup: SetupStore.load())
+            self?.codexRecorder.stopped(codexOn: on)
+            self?.syncDeskSources()
+            self?.fitPanelToContent()
+            self?.renderStatusItem()
+        }
+        // A section's chevron changes the widget's height.
+        widgetSources.onChange = { [weak self] in self?.fitPanelToContent() }
+        syncCodexSource()
+        NotificationCenter.default.addObserver(forName: .sanduhrSetupDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.syncCodexSource()
+                self?.fitPanelToContent()
+                self?.renderStatusItem()
+            }
+        }
+        // Settings, Usage, Sources: a color, Primary or Antigravity's switch changed.
+        NotificationCenter.default.addObserver(forName: .sanduhrSourcesDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.syncCodexSource()
+                self?.viewModel.vault.trigger()   // Antigravity switched on: its record catches up now
+                self?.fitPanelToContent()
+                self?.renderStatusItem()
+            }
+        }
+
         // Wire up status-item updates.
         viewModel.onUsageUpdate = { [weak self] in
+            self?.syncCodexSource()
             self?.renderStatusItem()
             self?.fitPanelToContent()
             // Desk takes the numbers straight from the view model, so its meters move with
@@ -230,6 +275,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = true
             applyWidgetVisibility(.signedOut)
         }
+    }
+
+    /// The Vault's Codex root catches up from the Codex poll at most every five minutes, so a Mac
+    /// with Claude off (no Claude refresh to trigger it) still records Codex's burn.
+    private var lastCodexIngest: Date?
+
+    private func triggerCodexIngest(now: Date = Date()) {
+        if let last = lastCodexIngest, now.timeIntervalSince(last) < 300 { return }
+        lastCodexIngest = now
+        viewModel.vault.trigger()
+    }
+
+    /// Starts or stops the Codex reader from the stored setup and demo mode. Idempotent.
+    private func syncCodexSource() {
+        widgetSources.reload()
+        codexUsage.update(on: CodexUsageService.wants(
+            setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
+        syncDeskSources()
+    }
+
+    /// Tells the Desk which sources are on and what Codex read, so its Claude pieces can show Codex or both.
+    /// A Mac with only Claude on hands it `claudeOnly`, which changes nothing the pieces draw.
+    private func syncDeskSources() {
+        let reading = CodexWidgetReading(usage: codexUsage.codexUsage, asOf: codexUsage.asOf,
+                                         freshTiers: codexUsage.freshTiers, emptyState: codexUsage.emptyState)
+        DeskController.shared.model.updateSources(DeskSourceInput.make(
+            setup: SetupStore.load(), sources: AgentSourceSettings.load(), codex: reading,
+            demo: viewModel.demo, now: Date()))
     }
 
     /// Claude usage as the last update saw it, to tell a switch from an ordinary refresh.
@@ -349,6 +422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             awaitingSignIn = !SignInGate.fetched(KeychainStore.accounts.active, in: UserDefaults.standard) || !hasKey
         }
         lastUsageOn = viewModel.usageOn
+        syncCodexSource()
         applyWidgetVisibility(.usageChanged)
         DeskController.shared.model.refreshClaude()
         renderStatusItem()
@@ -498,10 +572,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let reading = MenuBarText.reading(viewModel.usage, mode: .saved(), step: menuBarStep,
-                                          usageOn: viewModel.usageOn)
+        let setup = SetupStore.load()
+        let sources = AgentSourceSettings.load()
+        let display = MenuBarText.display(
+            primary: sources.primary(setup: setup),
+            claude: viewModel.usage, claudeOn: viewModel.usageOn,
+            codex: codexUsage.codexUsage, codexOn: sources.isOn(.codex, setup: setup),
+            codexFresh: codexUsage.freshTiers, mode: .saved(), step: menuBarStep)
+        // Only with another source further out, or a stale Codex primary; a Claude-only Mac has none.
+        button.toolTip = display.tooltip
 
-        if let reading {
+        if let reading = display.reading {
             let look = MenuBarItemLook(reading)
             button.attributedTitle = NSAttributedString(
                 string: look.title,

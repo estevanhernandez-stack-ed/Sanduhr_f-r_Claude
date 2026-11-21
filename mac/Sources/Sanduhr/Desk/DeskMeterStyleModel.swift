@@ -81,13 +81,17 @@ enum DeskMeterStyleModel {
         var warning: Bool
         /// Set by a reading that is not a Claude limit (the system piece's rows), so two share no id.
         var key: String? = nil
+        /// A reading two sources share: the two-tone fill (or arc, or cells) and ticks, in place of the one fill.
+        var layout: SourceBarLayout? = nil
+        /// A Codex window that is not fresh: the reading draws dimmed (`SourceBar.staleOpacity`).
+        var stale = false
         var id: String { key ?? tier.rawValue }
     }
 
     /// The Claude limits' meters as gauges, in the rows' order.
     static func gauges(_ rows: [DeskMeterRow]) -> [Gauge] {
         rows.map { Gauge(tier: $0.tier, label: $0.label, short: shortLabel($0.tier), percent: $0.percent,
-                         fill: $0.fill, pace: $0.pace, warning: $0.warning) }
+                         fill: $0.fill, pace: $0.pace, warning: $0.warning, layout: $0.layout, stale: $0.stale) }
     }
 
     /// The `claude` piece's ring and ticks gauges: the session and week limits only, each labelled
@@ -98,7 +102,7 @@ enum DeskMeterStyleModel {
         return rows.filter { $0.tier == .fiveHour || $0.tier == .sevenDay }.map { r in
             let name = r.tier == .fiveHour ? "session" : "week"
             return Gauge(tier: r.tier, label: name, short: name, percent: r.percent, fill: r.fill,
-                         pace: r.pace, warning: r.warning)
+                         pace: r.pace, warning: r.warning, layout: r.layout, stale: r.stale)
         }
     }
 
@@ -122,6 +126,36 @@ enum DeskMeterStyleModel {
     /// Where the 2-point pace mark of a slim or ticks meter starts along a `width` meter.
     static func markOffset(_ pace: Double, width: Double) -> Double {
         max(0, min(width - 2, pace * width - 1))
+    }
+
+    /// The part of a ring a source's stretch of the bar covers (`from` and `to` as 0 to 1 of the arc), as the
+    /// fractions of a full circle `Circle.trim` takes; nil for a stretch too short to draw (no round-cap dot).
+    static func ringSegment(from: Double, to: Double) -> (from: Double, to: Double)? {
+        let a = min(1, max(0, from.isFinite ? from : 0)), b = min(1, max(0, to.isFinite ? to : 0))
+        guard b - a > 0.001 else { return nil }
+        return (a * ringSweep / 360, b * ringSweep / 360)
+    }
+
+    /// The angle in degrees (clockwise from three o'clock) of a source's tick on a ring: the pace mark's rule.
+    static func ringTickAngle(at fraction: Double) -> Double { ringPaceAngle(fraction) }
+
+    /// One cell of a ticks meter drawing two or more sources: the color it is lit in (`#RRGGBB`), nil for an unlit cell.
+    struct SourceCell: Equatable {
+        var colorHex: String?
+        var stale: Bool
+    }
+
+    /// The cells of a ticks meter for a combined layout: the primary's lit cells in its color, the cells
+    /// the furthest other source reaches past them in its own color, the rest unlit. Each count is
+    /// `litTicks` of the stretch's end, so a reading above zero lights at least one cell.
+    static func sourceCells(_ layout: SourceBarLayout, cells: Int = ticks) -> [SourceCell] {
+        let own = layout.primary.map { litTicks($0.to, cells: cells) } ?? 0
+        let reach = max(own, layout.beyond.map { litTicks($0.to, cells: cells) } ?? 0)
+        return (0..<cells).map { i in
+            if i < own, let p = layout.primary { return SourceCell(colorHex: p.colorHex, stale: p.stale) }
+            if i < reach, let b = layout.beyond { return SourceCell(colorHex: b.colorHex, stale: b.stale) }
+            return SourceCell(colorHex: nil, stale: false)
+        }
     }
 
     /// A slim meter's filled width.

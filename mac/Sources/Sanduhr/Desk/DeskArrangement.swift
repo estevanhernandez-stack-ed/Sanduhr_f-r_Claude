@@ -105,6 +105,9 @@ struct DeskPlacement: Equatable, Hashable {
     var style: DeskMeterStyle = .bar
     /// The display the piece draws on (the layout word's `@` suffix); `.main` unless set.
     var monitor: DeskDisplay = .main
+    /// Which source a usage piece draws (the layout word's `src=` field): `.combined` for every piece
+    /// that has none, and for every layout written before 2.46.
+    var source: DeskMeterSource = .combined
 }
 
 /// Two pieces of one stack given different slants: the refusal a design or layout check reports.
@@ -136,6 +139,11 @@ struct DeskTiltConflict: Equatable {
 /// the suffix last (`clock:tl:1:0:bar@all`): a 2.43 build splits on `:`, reads fields 1 to 3 and
 /// ignores the rest, so it keeps the piece's anchor, size and tilt and only loses the display. The
 /// reader takes the suffix on any field count (`clock:tl@all`, `clock:tl:1.2@all`).
+/// A usage piece's source (Windows' field, 2.46) is a `src=codex` field wherever it stands, written
+/// after the other fields and before the display suffix, and only when not Combined (`claude:bl:src=codex`,
+/// `meters:tr:1:0:ring:src=claude@all`): the fields around it keep their places, so every older word reads
+/// and writes as it did, and an older build reads the size and tilt and ignores it. An unknown source,
+/// or one on a piece that takes none, reads as Combined.
 /// A stack is a display and an anchor: `tl` on two displays are two stacks, each with its own slant.
 struct DeskArrangement: Equatable {
     /// Known widgets, each once, in order: the order within an anchor is the order here.
@@ -198,7 +206,10 @@ struct DeskArrangement: Equatable {
                 word = full[..<at]
                 monitor = DeskDisplay.parse(String(full[full.index(after: at)...]))
             }
-            let bits = word.split(separator: ":").map(String.init)
+            // The source is a `src=` field wherever it stands; the others keep their places.
+            let all = word.split(separator: ":").map(String.init)
+            let sourceBit = all.first { $0.hasPrefix(DeskMeterSources.prefix) }
+            let bits = all.filter { !$0.hasPrefix(DeskMeterSources.prefix) }
             guard bits.count >= 2, known.contains(bits[0]) else { continue }
             let anchor = DeskAnchor(rawValue: bits[1]) ?? Self.defaultAnchor(bits[0])
             let scale = bits.count >= 3 ? Double(bits[2]).map(Self.clampScale) ?? 1 : 1
@@ -207,7 +218,9 @@ struct DeskArrangement: Equatable {
             // piece that has none, is a bar.
             let style = bits.count >= 5 ? DeskMeterStyles.parse(bits[4]).map { DeskMeterStyles.for(bits[0], $0) } ?? .bar : .bar
             pieces.removeAll { $0.widget == bits[0] }
-            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale, tilt: tilt, style: style, monitor: monitor))
+            let source = sourceBit.map { DeskMeterSources.fromField(bits[0], String($0.dropFirst(DeskMeterSources.prefix.count))) } ?? .combined
+            pieces.append(DeskPlacement(widget: bits[0], anchor: anchor, scale: scale, tilt: tilt, style: style, monitor: monitor,
+                                        source: source))
         }
     }
 
@@ -221,7 +234,10 @@ struct DeskArrangement: Equatable {
         let tilt = clampTilt(p.tilt)
         let style = DeskMeterStyles.for(p.widget, p.style)
         let suffix = p.monitor.suffix.map { "@" + $0 }
-        guard p.scale != 1 || tilt != 0 || style != .bar || suffix != nil else { return head }
+        // The source rides after every other field and before the display; Combined writes nothing.
+        let source = DeskMeterSources.for(p.widget, p.source)
+        let tail = source == .combined ? "" : ":" + DeskMeterSources.prefix + source.rawValue
+        guard p.scale != 1 || tilt != 0 || style != .bar || suffix != nil else { return head + tail }
         var word = head + ":" + String(format: "%g", p.scale)
         // A piece off the main display writes every field, so an older build reads the anchor, size
         // and tilt and skips the rest; the display rides last.
@@ -229,7 +245,7 @@ struct DeskArrangement: Equatable {
         // The fold rides after the size and the style after the fold, each only when not default.
         if tilt != 0 || style != .bar || long { word += ":" + String(format: "%.0f", tilt) }
         if style != .bar || long { word += ":" + DeskMeterStyles.word(style) }
-        return word + (suffix ?? "")
+        return word + tail + (suffix ?? "")
     }
 
     func placement(_ widget: String) -> DeskPlacement? {
@@ -291,7 +307,7 @@ struct DeskArrangement: Equatable {
         // Into a stack a piece takes its slant (one per stack); into an empty anchor it keeps its own.
         let moved = DeskPlacement(widget: widget, anchor: anchor, scale: old?.scale ?? 1,
                                   tilt: stackTilt(anchor, on: display) ?? old?.tilt ?? 0, style: old?.style ?? .bar,
-                                  monitor: display)
+                                  monitor: display, source: old?.source ?? .combined)
         let rank = Self.rank(widget)
         if stack(anchor, on: display).isEmpty {
             if let i = pieces.firstIndex(where: { $0.widget == widget }) {
@@ -360,6 +376,17 @@ struct DeskArrangement: Equatable {
     mutating func setStyle(_ widget: String, _ style: DeskMeterStyle) {
         guard let i = pieces.firstIndex(where: { $0.widget == widget }) else { return }
         pieces[i].style = DeskMeterStyles.for(widget, style)
+    }
+
+    /// Sets which source a placed piece draws; a piece that takes none stays Combined, a hidden piece has none.
+    mutating func setSource(_ widget: String, _ source: DeskMeterSource) {
+        guard let i = pieces.firstIndex(where: { $0.widget == widget }) else { return }
+        pieces[i].source = DeskMeterSources.for(widget, source)
+    }
+
+    /// The source `widget` draws: its own, `.combined` for a piece without one or one not placed.
+    func source(of widget: String) -> DeskMeterSource {
+        placement(widget).map { DeskMeterSources.for(widget, $0.source) } ?? .combined
     }
 
     /// The slant of the stack at `anchor`: its first piece's; nil when the anchor has none.

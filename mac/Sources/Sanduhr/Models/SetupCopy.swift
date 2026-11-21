@@ -11,6 +11,11 @@ enum SetupCopy {
     static let usageTitle = "Track my AI usage"
     static let usageBody = "See how much of your plan you've used."
     static let claudeSource = "Claude"
+    static let codexSource = "Codex"
+    /// Greyed under the Codex choice when there is no Codex folder to read.
+    static let codexNotInstalled = "Codex isn't installed on this Mac."
+    /// Shown wherever Codex is named (nominative use, as on Windows).
+    static let codexTrademark = "\"Codex\" is a trademark of OpenAI, used nominatively. Sanduhr für Claude is an independent third-party tool, not affiliated with, endorsed by, or associated with OpenAI."
     static let continueTitle = "Continue"
     static let notNow = "Not now"
     static let cancel = "Cancel"
@@ -22,6 +27,7 @@ enum SetupCopy {
     static let saveFailed = "Your choices could not be saved."
     static let desktopOffLine = "The clock, message and weather hide. Your layout is kept."
     static let usageOffLine = "Your account stays saved. Remove it in Settings, Accounts."
+    static let codexOffLine = "Codex limits stop being read. Nothing in Codex changes."
     static let addOnsStayLine = "The Claude Code add-ons stay installed. Remove them on the Claude Code page."
     static let arrangeNeedsDesktop = "Turn on A nicer desktop in Set up Sanduhr to arrange the Desk."
     /// Settings, Desk, under the Desk switch while A nicer desktop is off.
@@ -105,7 +111,7 @@ enum SetupCopy {
     /// For the copy tests.
     static var all: [String] {
         [title, intro, desktopTitle, desktopBody, drawersTitle, drawersBody, usageTitle, usageBody,
-         claudeSource, continueTitle, notNow, cancel, done, designButton, designCaption, menuItem, pickOne, saveFailed, desktopOffLine,
+         claudeSource, codexSource, codexNotInstalled, codexTrademark, codexOffLine, continueTitle, notNow, cancel, done, designButton, designCaption, menuItem, pickOne, saveFailed, desktopOffLine,
          usageOffLine, addOnsStayLine, whatChanges, whatHappened, usageOffSettingsLine,
          arrangeNeedsDesktop, deskHiddenLine, designDesktopOffNote, drawersFirstOnLine, nothingToSort, drawersOffLine(1), drawersOffLine(2)]
     }
@@ -123,6 +129,7 @@ enum SetupChange {
             if hasAccount { lines.append(SetupCopy.usageOffLine) }
             if addonsInstalled { lines.append(SetupCopy.addOnsStayLine) }
         }
+        if before.codexUsage && !after.codexUsage { lines.append(SetupCopy.codexOffLine) }
         return lines
     }
 

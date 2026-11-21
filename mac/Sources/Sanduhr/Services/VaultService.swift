@@ -19,6 +19,62 @@ struct VaultState: Equatable, Sendable {
     var lastIngestOK = false
 }
 
+/// The stop on an agent's Vault root (Windows' `vault_roots` tombstone): purging the root writes
+/// it, so no cycle brings the record back, and switching the agent's source on again clears it.
+/// Standard defaults, `vault.agentStopped.<agent>`, true while stopped.
+enum VaultAgentStop {
+    static func key(_ agent: AgentSource) -> String { "vault.agentStopped.\(agent.rawValue)" }
+
+    static func isStopped(_ agent: AgentSource, in d: DefaultsStore) -> Bool {
+        d.bool(forKey: key(agent))
+    }
+
+    static func stop(_ agent: AgentSource, in d: DefaultsStore) {
+        d.set(true, forKey: key(agent))
+    }
+
+    /// The source was switched on: its record starts again.
+    static func clear(_ agent: AgentSource, in d: DefaultsStore) {
+        guard d.object(forKey: key(agent)) != nil else { return }
+        d.set(nil, forKey: key(agent))
+    }
+
+    /// The agent whose root a vault directory is (`codex`, `antigravity`), or nil for a Claude
+    /// Code folder's record (16 hex digits).
+    static func agent(ofRoot id: String) -> AgentSource? {
+        guard let a = AgentSource(rawValue: id), a != .claude else { return nil }
+        return a
+    }
+}
+
+/// The agent roots to ingest now (every-agents spec, section 3): Codex while its setup switch is
+/// on and a Codex home exists, the Antigravity CLI while `sources.antigravity.on` is set and its
+/// folder exists. Agent roots are not accounts, so there is no Keep a record gate.
+enum VaultAgents {
+    static func active(setup: SetupSettings?, sources: AgentSourceSettings, codexHomes: () -> [URL],
+                       antigravityHome: () -> URL? = { AntigravityBurnReader.liveHome() }) -> [AgentBurnSource] {
+        var out: [AgentBurnSource] = []
+        if sources.isOn(.codex, setup: setup) {
+            let homes = codexHomes()
+            if !homes.isEmpty { out.append(CodexBurnReader(homes: homes)) }
+        }
+        if sources.isOn(.antigravity, setup: setup), let home = antigravityHome(), isFolder(home) {
+            out.append(AntigravityBurnReader(home: home))
+        }
+        return out
+    }
+
+    private static func isFolder(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
+    }
+
+    /// This Mac's: the stored setup and sources, the real Codex and Antigravity folders.
+    static func live() -> [AgentBurnSource] {
+        active(setup: SetupStore.load(), sources: AgentSourceSettings.load(), codexHomes: CodexHomes.live)
+    }
+}
+
 /// The app's owner of the vault (item 46), Windows `VaultService` per account: which folders
 /// are recorded, the ingest after launch and every refresh, and erase.
 ///
@@ -37,6 +93,11 @@ struct VaultState: Equatable, Sendable {
 /// before each file and before its writes and stops without writing; then the folder's vault
 /// directory is deleted. A holder that never lets go doesn't block the erase: it deletes anyway
 /// and deletes again once it gets the lock.
+///
+/// **Agent roots** (`vault/codex`; every-agents spec, section 3) ingest after the Claude Code
+/// folders while their source is on and they aren't stopped, each in its own scope: a source that
+/// throws skips only its own root. Demo mode pauses them. Erasing one stops it
+/// (`VaultAgentStop`) until its source is switched on again.
 final class VaultService: @unchecked Sendable {
     static let eraseWait: TimeInterval = 10
 
@@ -53,10 +114,15 @@ final class VaultService: @unchecked Sendable {
     private var stopped = false
     private var lastOK: [String: Bool] = [:]
     private var _onCycleEnd: (@Sendable () -> Void)?
+    private var _agentsPaused = false
+    /// The agent sources that are on, read at every cycle so a switch counts at the next one.
+    private let agentSources: () -> [AgentBurnSource]
 
     init(vaultDir: String, defaults: @escaping () -> DefaultsStore, writerVersion: String,
          timeZone: TimeZone = .current, log: VaultLogSink? = VaultLog.system,
-         dirHoldsGit: ((String) -> Bool)? = nil) {
+         dirHoldsGit: ((String) -> Bool)? = nil,
+         agentSources: @escaping () -> [AgentBurnSource] = { [] }) {
+        self.agentSources = agentSources
         store = VaultStore(vaultDir: vaultDir, log: log)
         reader = VaultReader(store: store)
         lockPath = (vaultDir as NSString).appendingPathComponent(".writer.lock")
@@ -69,7 +135,8 @@ final class VaultService: @unchecked Sendable {
     static let standard: VaultService = {
         let dir = HistoryStore.Files.standard.dir.appendingPathComponent("vault", isDirectory: true).path
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
-        return VaultService(vaultDir: dir, defaults: { KeychainStore.accounts.defaults }, writerVersion: version)
+        return VaultService(vaultDir: dir, defaults: { KeychainStore.accounts.defaults }, writerVersion: version,
+                            agentSources: VaultAgents.live)
     }()
 
     // MARK: Who is recorded
@@ -93,6 +160,19 @@ final class VaultService: @unchecked Sendable {
         roots(in: d).contains { $0.id == id }
     }
 
+    /// The agent roots to ingest now: the sources that are on, less any stopped by an erase, and
+    /// none while demo mode pauses them.
+    func activeAgents(in d: DefaultsStore) -> [AgentBurnSource] {
+        guard !agentsPaused else { return [] }
+        return agentSources().filter { !VaultAgentStop.isStopped($0.agent, in: d) }
+    }
+
+    /// Demo mode: no agent root ingests (the Claude Code folders keep their record).
+    var agentsPaused: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return _agentsPaused }
+        set { lock.lock(); _agentsPaused = newValue; lock.unlock() }
+    }
+
     // MARK: Ingest
 
     /// Starts a cycle off the main thread unless one is running or nothing is recorded.
@@ -100,7 +180,8 @@ final class VaultService: @unchecked Sendable {
         guard !isStopped, !ResetGate.isOn else { return }
         let d = defaults()
         let roots = Self.roots(in: d)
-        guard !roots.isEmpty else { return }
+        let agents = activeAgents(in: d)
+        guard !roots.isEmpty || !agents.isEmpty else { return }
         lock.lock()
         guard !running else {
             lock.unlock()
@@ -109,7 +190,7 @@ final class VaultService: @unchecked Sendable {
         running = true
         lock.unlock()
         queue.async { [self] in
-            _ = ingestNow(roots)
+            _ = ingestNow(roots, agents: agents)
             lock.lock()
             running = false
             // The stored value, not `onCycleEnd`: its getter takes this same lock, which is not
@@ -139,11 +220,13 @@ final class VaultService: @unchecked Sendable {
     }
 
     /// One cycle, on the caller's thread: each folder in turn, every write rechecked against
-    /// the current choices. Returns the counts summed.
+    /// the current choices, then each agent root. Returns the counts summed.
     @discardableResult
-    func ingestNow(_ roots: [VaultRoot]? = nil, now: Date = Date()) -> VaultIngestResult {
+    func ingestNow(_ roots: [VaultRoot]? = nil, agents: [AgentBurnSource]? = nil,
+                   now: Date = Date()) -> VaultIngestResult {
         let d = defaults()
         let list = roots ?? Self.roots(in: d)
+        let agentList = agents ?? activeAgents(in: d)
         var total = VaultIngestResult()
         for root in list {
             let recording: (String) -> Bool = { Self.isRecording($0, in: self.defaults()) }
@@ -157,6 +240,23 @@ final class VaultService: @unchecked Sendable {
             if r.rootsWithdrawn == 0 {
                 lock.lock()
                 lastOK[root.id] = r.rootsAborted == 0
+                lock.unlock()
+            }
+        }
+        guard total.acquired else { return total }
+        for source in agentList {
+            let agent = source.agent
+            // An erase during the cycle stops the agent first; its writes are then dropped.
+            let r = ingester.ingestAgent(source, now: now,
+                                         stillRecording: { _ in !VaultAgentStop.isStopped(agent, in: self.defaults()) })
+            guard r.acquired else {
+                total.acquired = false
+                break
+            }
+            total.add(r)
+            if r.rootsWithdrawn == 0 {
+                lock.lock()
+                lastOK[agent.rawValue] = r.rootsAborted == 0
                 lock.unlock()
             }
         }
@@ -195,6 +295,7 @@ final class VaultService: @unchecked Sendable {
     @discardableResult
     func eraseNow(id: String, wait: TimeInterval = VaultService.eraseWait) -> Bool {
         guard VaultStewardship.isRecordID(id) else { return false }
+        if let agent = VaultAgentStop.agent(ofRoot: id) { return eraseAgentNow(agent, wait: wait) }
         guard !Self.isRecording(id, in: defaults()) else { return false }
         let held = VaultWriterLock.acquire(lockPath, timeout: wait)
         guard !Self.isRecording(id, in: defaults()) else {
@@ -219,11 +320,36 @@ final class VaultService: @unchecked Sendable {
         return gone
     }
 
+    /// An agent root's erase: the stop first (a cycle rechecks it before writing), then the
+    /// directory, under the writer lock when it comes within `wait`.
+    private func eraseAgentNow(_ agent: AgentSource, wait: TimeInterval) -> Bool {
+        let id = agent.rawValue
+        VaultAgentStop.stop(agent, in: defaults())
+        let held = VaultWriterLock.acquire(lockPath, timeout: wait)
+        let gone = store.purgeRoot(id)
+        lock.lock()
+        lastOK.removeValue(forKey: id)
+        lock.unlock()
+        if let held {
+            held.release()
+        } else {
+            eraseQueue.async { [self] in
+                guard let late = VaultWriterLock.acquire(lockPath, timeout: 600) else { return }
+                if VaultAgentStop.isStopped(agent, in: defaults()) { store.purgeRoot(id) }
+                late.release()
+            }
+        }
+        return gone
+    }
+
     // MARK: State
 
     /// Every record on this Mac, linked or not (item 48's stewardship list).
     func records(_ choices: [String: AccountDataChoices]) -> [VaultRecordInfo] {
-        VaultStewardship.records(in: store, choices: choices)
+        let d = defaults()
+        let on = Set(agentSources().map(\.agent))
+        return VaultStewardship.records(in: store, choices: choices,
+                                        agentRecording: { on.contains($0) && !VaultAgentStop.isStopped($0, in: d) })
     }
 
     /// Session-shard months kept for the folder.

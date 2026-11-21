@@ -7,17 +7,25 @@ import Foundation
 struct SetupSettings: Equatable {
     static let key = "setup"
     static let claude = "claude"
+    static let codex = "codex"
 
     var desktop: Bool
     var usage: [String: Bool]
 
     var claudeUsage: Bool { usage[Self.claude] ?? false }
+    var codexUsage: Bool { usage[Self.codex] ?? false }
     /// Any usage source on.
     var usageOn: Bool { usage.values.contains(true) }
 
     func withClaude(_ on: Bool) -> SetupSettings {
         var copy = self
         copy.usage[Self.claude] = on
+        return copy
+    }
+
+    func withCodex(_ on: Bool) -> SetupSettings {
+        var copy = self
+        copy.usage[Self.codex] = on
         return copy
     }
 
@@ -45,27 +53,31 @@ struct SetupSettings: Equatable {
     }
 }
 
-/// The three ticks on the setup screen. Desktop reads as ticked only while the Desk runs.
+/// The ticks on the setup screen. Desktop reads as ticked only while the Desk runs.
 struct SetupChoices: Equatable {
     var desktop: Bool
     var drawers: Bool
     var claudeUsage: Bool
+    var codexUsage: Bool = false
 
     /// A first run's ticks: the desktop and drawers, no usage.
     static let firstRun = SetupChoices(desktop: true, drawers: true, claudeUsage: false)
 
-    var anyTicked: Bool { desktop || drawers || claudeUsage }
+    var anyTicked: Bool { desktop || drawers || claudeUsage || codexUsage }
     /// The Desk runs whenever desktop or drawers is ticked.
     var deskRuns: Bool { desktop || drawers }
 
     static func of(_ s: SetupSettings, drawersOn: Bool, deskEnabled: Bool) -> SetupChoices {
-        SetupChoices(desktop: s.desktop && deskEnabled, drawers: drawersOn, claudeUsage: s.claudeUsage)
+        SetupChoices(desktop: s.desktop && deskEnabled, drawers: drawersOn, claudeUsage: s.claudeUsage,
+                     codexUsage: s.codexUsage)
     }
 
     /// The stored setup for these ticks; sources this build does not show keep their value from `before`.
     func toSettings(before: SetupSettings?) -> SetupSettings {
         var usage = before?.usage ?? [:]
         usage[SetupSettings.claude] = claudeUsage
+        // Codex's entry is written once it has been on, so a Claude-only Mac keeps `{claude: Bool}` as 2.45.0 stored it.
+        if codexUsage || usage[SetupSettings.codex] != nil { usage[SetupSettings.codex] = codexUsage }
         return SetupSettings(desktop: desktop, usage: usage)
     }
 }

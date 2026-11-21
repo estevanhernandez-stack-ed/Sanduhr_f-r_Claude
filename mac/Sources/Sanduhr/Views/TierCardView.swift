@@ -20,6 +20,13 @@ struct TierCardView: View {
     /// Tokens Claude Code used in this limit since the last refresh (item 45,
     /// `UsageViewModel.localBurn`): the "+Nk" before the percent, hidden at zero.
     var localTokens: Int64 = 0
+    /// The card's own label in place of `tier.label` (Codex's "Weekly"), and what a screen reader
+    /// calls the bar ("Codex weekly"). Nil keeps the tier's label for both.
+    var label: String?
+    var spokenLabel: String?
+    /// A number that can't be trusted now (a stale Codex window): no pace marker, pace or burn.
+    /// The card's dimming is the caller's.
+    var stale = false
 
     @State private var showDeepMath = false
 
@@ -36,11 +43,11 @@ struct TierCardView: View {
         VStack(alignment: .leading, spacing: 5) {
             headerRow
             ProgressBarView(utilization: util,
-                            paceFraction: paceFrac(usage.resetsAt, tier: tier),
+                            paceFraction: stale ? nil : paceFrac(usage.resetsAt, tier: tier),
                             palette: palette,
                             warning: warning)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(tier.label)
+                .accessibilityLabel(spokenLabel ?? label ?? tier.label)
                 .accessibilityValue(spokenWithLocal)
             infoRow
             reminderRow
@@ -82,7 +89,7 @@ struct TierCardView: View {
 
     private var headerRow: some View {
         HStack(spacing: 6) {
-            Text(tier.label)
+            Text(label ?? tier.label)
                 .font(.app(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(palette.textSecondary)
                 .lineLimit(1)
@@ -144,7 +151,9 @@ struct TierCardView: View {
 
             Spacer()
 
-            if showDeepMath || pinDeepMath {
+            if stale {
+                EmptyView()
+            } else if showDeepMath || pinDeepMath {
                 if let cooldown = calculateCooldown(util: util, iso: usage.resetsAt, tier: tier) {
                     Text("Cool down: \(cooldown)")
                         .font(.app(size: 9, weight: .semibold, design: palette.numericFontDesign))
@@ -179,7 +188,7 @@ struct TierCardView: View {
 
             Spacer()
 
-            if let burn = burnProjection(util: util, iso: usage.resetsAt, tier: tier) {
+            if !stale, let burn = burnProjection(util: util, iso: usage.resetsAt, tier: tier) {
                 Text(burn.text)
                     .font(.app(size: 8))
                     .foregroundStyle(Color.hex(burn.colorHex))

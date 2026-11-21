@@ -316,15 +316,15 @@ struct VaultReaderTests {
 
     @Test func ledgerHeaderAlwaysAndRowsInGivenOrder() {
         let empty = VaultLedgerCsv.build([])
-        #expect(empty.text == "session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models\r\n")
+        #expect(empty.text == "session,root,project,first_seen_utc,last_seen_utc,tokens_in_scope,tokens_total,models,agent\r\n")
         #expect(empty.rowCount == 0)
 
         let built = VaultLedgerCsv.build([
             .init(uuid: "u2", root: ".claude", project: "api", firstTs: "2026-07-11T00:00:00+00:00",
-                  lastTs: "2026-07-11T01:00:00+00:00", tokensInScope: 200, tokensTotal: 200, models: "claude-fable-5:200"),
+                  lastTs: "2026-07-11T01:00:00+00:00", tokensInScope: 200, tokensTotal: 200, models: "claude-fable-5:200", agent: "Claude Code"),
             .init(uuid: "u1", root: ".claude", project: "web", firstTs: "2026-07-10T00:00:00+00:00",
                   lastTs: "2026-07-10T01:00:00+00:00", tokensInScope: 100, tokensTotal: 600,
-                  models: "claude-fable-5:400;claude-sonnet-5:200"),
+                  models: "claude-fable-5:400;claude-sonnet-5:200", agent: "Claude Code"),
         ])
         #expect(built.rowCount == 2)
         let lines = built.text.components(separatedBy: "\r\n")
@@ -336,7 +336,7 @@ struct VaultReaderTests {
     @Test func ledgerQuotesCommasAndQuotes() {
         let built = VaultLedgerCsv.build([
             .init(uuid: "u1", root: ".claude", project: "odd,\"proj\"", firstTs: "t", lastTs: "t",
-                  tokensInScope: 1, tokensTotal: 1, models: "m"),
+                  tokensInScope: 1, tokensTotal: 1, models: "m", agent: "Claude Code"),
         ])
         #expect(built.text.contains("\"odd,\"\"proj\"\"\""))
     }
@@ -351,5 +351,6 @@ struct VaultReaderTests {
         #expect(row.firstTs == "2026-07-10T15:00:00Z")
         #expect(row.lastTs == "2026-07-10T16:00:00Z")
         #expect(row.models == "claude-fable-5:400;claude-sonnet-5:200")
+        #expect(row.agent == "Claude Code")
     }
 }

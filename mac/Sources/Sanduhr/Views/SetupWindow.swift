@@ -22,8 +22,11 @@ final class SetupWindowController: NSObject, NSWindowDelegate {
         guard let app = NSApp.delegate as? AppDelegate else { return }
         let host = AppSetupHost(usage: app.viewModel, confirm: Self.confirmPutBack)
         let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
+        let codexHere = CodexInstall.isInstalled(home: FileManager.default.homeDirectoryForCurrentUser,
+                                                 environment: ProcessInfo.processInfo.environment)
         let model = SetupViewModel(service: service, firstRun: SetupStore.load() == nil,
-                                   hasAccount: { !app.viewModel.accountLabels.isEmpty })
+                                   hasAccount: { !app.viewModel.accountLabels.isEmpty },
+                                   codexInstalled: codexHere)
         model.onApplied = { [weak app] result in app?.afterSetup(result) }
         model.onClose = { [weak self] in self?.close() }
         model.onDesignWithChat = { ChatDesignWindowController.shared.show() }
@@ -92,6 +95,28 @@ struct SetupView: View {
             choice(SetupCopy.desktopTitle, SetupCopy.desktopBody, $model.desktop)
             choice(SetupCopy.drawersTitle, SetupCopy.drawersBody, $model.drawers)
             choice(SetupCopy.usageTitle, SetupCopy.usageBody, $model.claudeUsage, source: SetupCopy.claudeSource)
+            codexChoice
+        }
+    }
+
+    /// Codex under the usage choice: it never signs in, and is greyed with a line when its folder is absent.
+    private var codexChoice: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(SetupCopy.codexSource, isOn: $model.codexUsage)
+                .font(.headline)
+                .disabled(!model.codexEnabled)
+                .accessibilityLabel(SetupCopy.codexSource)
+            if let line = model.codexNotInstalledLine {
+                Text(line)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 20)
+            }
+            Text(SetupCopy.codexTrademark)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.leading, 20)
         }
     }
 

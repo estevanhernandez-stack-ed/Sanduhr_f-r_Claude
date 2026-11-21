@@ -165,6 +165,20 @@ class GetDesk(Base):
         self.assertEqual(len(r["limits"]["piece_style"]["values"]), 4)
         self.assertEqual(r["limits"]["piece_tilt"], {"min": -20, "max": 20})
 
+    def test_it_reports_each_usage_pieces_source_and_the_pieces_that_take_one(self):
+        def edit(doc):
+            doc["design"]["layout"]["claude"]["source"] = "combined"
+            doc["design"]["layout"]["meters"] = {"anchor": "tr", "size": 1, "hidden": False, "tilt": 0, "style": "ring", "source": "codex"}
+            doc["limits"]["piece_source"] = {"pieces": ["claude", "meters"], "values": ["combined", "claude", "codex"], "default": "combined"}
+        self.write_state(edit)
+        r = mcp.build_get_desk(now=NOW, paths=self.paths)
+        self.assertEqual(r["design"]["layout"]["claude"]["source"], "combined")
+        self.assertEqual(r["design"]["layout"]["meters"]["source"], "codex")
+        self.assertNotIn("source", r["design"]["layout"]["clock"])
+        self.assertEqual(r["limits"]["piece_source"]["pieces"], ["claude", "meters"])
+        self.assertEqual(r["limits"]["piece_source"]["values"], ["combined", "claude", "codex"])
+        self.assertEqual(r["limits"]["piece_source"]["default"], "combined")
+
     def test_it_names_what_is_wrong_with_a_state_it_cannot_use(self):
         for text, reason in (("not json", "malformed"), ("[]", "malformed"),
                              (json.dumps({"schema_version": 2}), "schema_unsupported"),
@@ -228,6 +242,11 @@ class ProposeRefusals(Base):
             ({"layout": {"clock": {"anchor": "bl", "style": "ring"}}}, "layout.clock.style"),
             ({"layout": {"meters": {"style": "gauge"}}}, "layout.meters.style"),
             ({"layout": {"claude": {"style": True}}}, "layout.claude.style"),
+            ({"layout": {"clock": {"anchor": "bl", "source": "codex"}}}, "layout.clock.source"),
+            ({"layout": {"telemetry": {"source": "claude"}}}, "layout.telemetry.source"),
+            ({"layout": {"meters": {"source": "gpt"}}}, "layout.meters.source"),
+            ({"layout": {"claude": {"source": True}}}, "layout.claude.source"),
+            ({"layout": {"claude": {"source": 2}}}, "layout.claude.source"),
         )
         for design, field in cases:
             with self.subTest(design=design):
@@ -277,6 +296,53 @@ class ProposeRefusals(Base):
         self.assertEqual(r["status"], "queued")
         design = self.request()["design"]
         self.assertEqual((design["name"], design["note"]), ("Outer", "Outer note."))
+
+
+class ProposeSource(Base):
+    """Which source a usage piece draws (2.46): Windows' field names and words, on the pieces that take one."""
+
+    def test_a_source_is_accepted_on_the_pieces_that_take_one_and_queued(self):
+        r = self.propose({"layout": {"meters": {"anchor": "tr", "source": "codex"}, "claude": {"source": " Claude "}}})
+        self.assertEqual(r["status"], "queued")
+        layout = self.request()["design"]["layout"]
+        self.assertEqual(layout["meters"], {"anchor": "tr", "source": "codex"})
+        self.assertEqual(layout["claude"], {"source": "claude"})
+
+    def test_every_word_is_accepted(self):
+        for word in mcp.DESIGN_SOURCES:
+            with self.subTest(word=word):
+                self.assertEqual(self.propose({"layout": {"meters": {"source": word}}})["status"], "queued")
+                self.assertEqual(self.request()["design"]["layout"]["meters"]["source"], word)
+
+    def test_the_pieces_and_words_are_the_apps(self):
+        self.assertEqual(mcp.DESIGN_SOURCE_PIECES, ("claude", "meters"))
+        self.assertEqual(mcp.DESIGN_SOURCES, ("combined", "claude", "codex"))
+
+    def test_a_design_that_names_no_source_sends_none(self):
+        self.propose({"layout": {"meters": {"anchor": "tr", "style": "ring"}}})
+        self.assertNotIn("source", self.request()["design"]["layout"]["meters"])
+
+    def test_a_hidden_piece_has_no_source(self):
+        self.propose({"layout": {"meters": {"hidden": True, "source": "codex"}}})
+        self.assertEqual(self.request()["design"]["layout"]["meters"], {"hidden": True})
+
+    def test_the_refusals_name_the_pieces_and_the_words(self):
+        r = self.propose({"layout": {"clock": {"source": "codex"}, "meters": {"source": "gpt"}}})
+        self.assertEqual(r["status"], "rejected")
+        by_field = {x["field"]: x["message"] for x in r["reasons"]}
+        self.assertEqual(by_field["layout.clock.source"], "only claude, meters take a source")
+        self.assertEqual(by_field["layout.meters.source"], "must be one of combined, claude, codex")
+        self.assert_no_request()
+
+    def test_the_unknown_member_message_lists_source(self):
+        r = self.propose({"layout": {"clock": {"color": "red"}}})
+        self.assertIn("use anchor, size, hidden, monitor, tilt, style and source", r["reasons"][0]["message"])
+
+    def test_the_tool_descriptions_and_schema_say_so(self):
+        tool = next(t for t in mcp.TOOLS if t["name"] == "propose_desk")
+        self.assertIn("source", tool["description"])
+        self.assertIn("combined|claude|codex", tool["inputSchema"]["properties"]["design"]["properties"]["layout"]["description"])
+        self.assertIn("source", next(t for t in mcp.TOOLS if t["name"] == "get_desk")["description"])
 
 
 class ProposeWeather(Base):

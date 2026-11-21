@@ -11,6 +11,10 @@ output, so a statusline reads the same on either machine:
 Per-seat meters (item 74): the session's Claude Code folder (CLAUDE_CONFIG_DIR, unset meaning
 ~/.claude) is looked up in seats.json beside the snapshot; a linked folder reads its own account's
 snapshot.<account_ref>.json, any other reads snapshot.json (Sanduhr's active account) as before.
+Codex (agent sources): when snapshot.codex.json beside the snapshot is under 30 minutes old by its
+`captured_at`, its meters follow Claude's as `cx 5h 40% wk 12%` (nothing when it is absent, stale or
+a newer schema; a Codex-only Mac prints just that). It rides with the session and weekly meters, so
+`--mine` without either hides it; with `--band` it stays here, since the band draws Claude's alone.
 Per-model weeklies join only when hot (>= 80%). Reads the snapshot only; never
 touches claude.ai or the session key. When the snapshot is dead or missing and Claude
 Code's session JSON on stdin carries `rate_limits`, those numbers stand in, each marked
@@ -68,6 +72,11 @@ DEAD_SECONDS = 900
 # SANDUHR_SNAPSHOT names one file and skips the seat lookup; SANDUHR_SUPPORT_DIR moves the folder.
 SUPPORT_DIR = os.path.expanduser("~/Library/Application Support/Sanduhr")
 LABELS = {"five_hour": "5h", "seven_day": "wk"}
+# Codex's own snapshot (agent sources): fresh for 30 minutes of Codex idle time (the widget's rule),
+# not Claude's 15. A schema this script doesn't know, or one past the age, prints nothing.
+CODEX_FILE = "snapshot.codex.json"
+CODEX_FRESH_SECONDS = 1800
+CODEX_MAX_BYTES = 64 * 1024
 
 CHAIN_BUDGET = 1.5          # seconds the user's command gets
 CHAIN_CAP = 64 * 1024       # bytes of its output kept
@@ -184,7 +193,8 @@ def format_parts(base, mine=MINE_DEFAULT, extra=(), sep=" | ", styles=None):
             line += " (as of %s)" % base["as_of"]
         elif line and base.get("ago") is not None:
             line += " (%dm ago)" % base["ago"]
-    rest = [x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra if name in mine] if x]
+    rest = [x for x in [line] + [styled_text(text, styles.get(name)) for name, text in extra
+                                 if name in mine or name == "codex"] if x]
     # The label leads a line that has something to say; alone it would be a line with no numbers.
     return sep.join(lead + rest) if rest else ""
 
@@ -390,10 +400,53 @@ def load_snapshot():
     return (snap if isinstance(snap, dict) else None), seat
 
 
-def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
+def codex_path(env=None):
+    """Codex's snapshot, beside the Claude one: SANDUHR_SNAPSHOT's folder when a test names one
+    file, else the support folder. Codex belongs to no Claude seat, so seats.json never applies."""
+    env = os.environ if env is None else env
+    if env.get("SANDUHR_SNAPSHOT"):
+        return os.path.join(os.path.dirname(os.path.abspath(env["SANDUHR_SNAPSHOT"])), CODEX_FILE)
+    return os.path.join(env.get("SANDUHR_SUPPORT_DIR") or SUPPORT_DIR, CODEX_FILE)
+
+
+def codex_segment(now, env=None):
+    """Codex's meters as `cx 5h 40% wk 12%`, or None: no file, unreadable, a newer schema, older than
+    30 minutes by `captured_at` (the Codex event's own time), or no window left to show. A window past
+    its reset is left out, as Claude's is. Same output as Windows' statusline segment."""
+    try:
+        with open(codex_path(env), "rb") as f:
+            raw = f.read(CODEX_MAX_BYTES + 1)
+        if len(raw) > CODEX_MAX_BYTES:
+            return None
+        snap = json.loads(raw.decode("utf-8"))
+        if not isinstance(snap, dict) or int(snap.get("schema_version", 0)) > SCHEMA_VERSION:
+            return None
+    except (OSError, ValueError, TypeError):
+        return None
+    age = snapshot_age(snap, now)
+    if age is None or age > CODEX_FRESH_SECONDS:
+        return None
+    bits = []
+    for tier in snap.get("tiers") or []:
+        if not isinstance(tier, dict):
+            continue
+        label = LABELS.get(str(tier.get("key") or ""))
+        util = tier.get("utilization")
+        if label is None or isinstance(util, bool) or not isinstance(util, (int, float)):
+            continue
+        reset = parse(tier.get("resets_at")) if isinstance(tier.get("resets_at"), str) else None
+        if reset is not None and reset <= now:
+            continue
+        bits.append("%s %d%%" % (label, int(util)))
+    return "cx " + " ".join(bits) if bits else None
+
+
+def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT, codex=None):
     """Sanduhr's line as (base, extra) for `format_parts`: the snapshot's parts, or stdin's
     `rate_limits` when the snapshot is dead or missing (`stdin_bytes` is a callable so plain
-    mode reads stdin only then), and stdin's context and model when `mine` asks for them."""
+    mode reads stdin only then), and stdin's context and model when `mine` asks for them. Codex's
+    meters follow as an extra named `codex` (not a `--mine` name: it rides with the session and
+    weekly meters, so a pick without either hides it); `codex` overrides that for the band."""
     cache = []
 
     def session():
@@ -417,9 +470,15 @@ def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT):
         if base is None:
             base = render_parts(snap, now, seat) if snap is not None else {"notice": ""}
     extra = session_parts(session()) if "context" in mine or "model" in mine else []
+    extra = list(extra)
+    if codex is None:
+        codex = "session" in mine or "weekly" in mine
+    cx = codex_segment(now) if codex else None
+    if cx:
+        extra = [("codex", cx)] + extra
     label = seat_label() if "label" in mine else None
     if label:
-        extra = [("label", label)] + list(extra)
+        extra = [("label", label)] + extra
     return base, extra
 
 
@@ -1216,8 +1275,11 @@ def combined(theirs, data, now, mode, padding, picks, mine, cols, band=False):
     sep = _glue(glue) if glue else " | "
     styles = (picks or {}).get("ours") or {}
     if band:
-        _, extra = segment_parts(lambda: data, now, mine or ())
-        ours = sep.join(styled_text(text, styles.get(name)) for name, text in extra if name in (mine or ()))
+        # The band mod draws Claude's meters only, so Codex's stay here unless `--mine` leaves meters out.
+        _, extra = segment_parts(lambda: data, now, mine or (),
+                                 codex=mine is None or "session" in mine or "weekly" in mine)
+        ours = sep.join(styled_text(text, styles.get(name)) for name, text in extra
+                        if name in (mine or ()) or name == "codex")
     else:
         ours = segment(lambda: data, now, mine or MINE_DEFAULT, sep, styles)
     return join(filter_theirs(theirs, picks), ours, mode, padding, cols, _glue(glue) if glue else SEPARATOR)
