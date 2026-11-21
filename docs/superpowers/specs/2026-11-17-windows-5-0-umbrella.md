@@ -62,6 +62,11 @@ written (release-runbook Phases 2 and 7).
   project's name and how long the turn ran.
 - **Hosted privacy page.** `docs/store/hub-privacy-5.0.0.md` holds spec 4's paragraph; each later 5.0 part
   adds its own. File the hub issue and check the page before the Store commit.
+- **Ready-made looks and the glow (spec 5).** No new data, destination, capability or file: the looks are embedded, the wallpaper on
+  a card stays in memory, the glow is two values inside `desk_ink`. Reviewer letter: nothing required. Store What's New: a line for
+  the six looks and one for the neon glow. Trailer: flip through the looks in Settings ▸ Desk. The Mac's MCP refuses `glow` by design.
+  Under the desktop icons the glow is one color (measured, 8.54 ms against an 8 ms budget). The setup window is capped at the
+  screen's work area. One Settings guard moved: Tab reaches Pieces in 11 stops, was under 10; the owner confirms.
 - **Arm64 (spec 7).** Reviewer letter: one sentence that the submission carries an x64 and an arm64
   package with the same features and the same capabilities. Store Listing Console:
   `apps/sanduhr/config.toml` lists both package files under `packages`. Partner Center: both packages

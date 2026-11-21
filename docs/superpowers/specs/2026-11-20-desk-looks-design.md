@@ -1,6 +1,6 @@
 # Ready-made Desk looks and the neon glow: design (5.0 spec 5)
 
-**Status:** design approved in chat by Este, 2026-11-20. Windows only.
+**Status:** design approved by Este, 2026-11-20; amended with the plan (2026-11-20-desk-looks.md) where the code map changed it. Windows only.
 **Umbrella:** `2026-11-17-windows-5-0-umbrella.md`. **Builds on:** `2026-10-21-desk-design-design.md`
 (the design format, the validator, saved designs and Put my Desk back).
 **Decisions:** dashboard `PxXvRHTsj8Y2ITITu9M4` (looks lead the customizer track), `O2UrEEfYnaPsd9J4KkPl`
@@ -75,6 +75,8 @@ Six JSON files, embedded in the app. One per look:
 - `monitor` on any piece. Each piece stays on the screen the user put it on.
 - `meetings`, a drawer word, or `name` and `note` (the wrapper names the look).
 
+The pieces at one anchor stack in the order the file lists them.
+
 Drawers are not part of a look and stay where they are, as they do for every design.
 
 ### The six, as starting compositions
@@ -84,19 +86,19 @@ pin the rules above, not these positions.
 
 | Look | Font (fallback) | Ink | Plate | Glow | Arrangement |
 |---|---|---|---|---|---|
-| Quiet corner | Segoe UI Light (Segoe UI) | `auto` | off | off | Small clock, Claude line and now playing, all bottom-left |
+| Quiet corner | Corbel (Segoe UI) | `auto` | off | off | Small clock, Claude line and now playing, all bottom-left |
 | Ice | EsteFont Pro | Ice gradient | off | off | Large clock bottom-left, message above it, weather top-right |
 | Marquee | Bahnschrift (Segoe UI) | Marquee amber, `#ffd08a` | off | on | Large clock top-center, message under it, now playing bottom-center |
 | Terminal | Consolas | one green, starting at `#7cfc9a` | off | off | A left column: clock, Claude line, meters and telemetry as ticks |
 | Editorial | Georgia | `light` | off | off | Large serif clock top-left, message beside it as a pull quote, weather bottom-left |
-| Dashboard | Segoe UI Semibold (Segoe UI) | `auto` | on | off | A right column: clock, meters and telemetry as rings, watchers, launcher along the bottom |
+| Dashboard | Segoe UI | `auto` | on | off | A right column: clock, meters and telemetry as rings, watchers, launcher along the bottom |
 
 Marquee keeps the glow and no drop shadow; the other five keep the drop shadow and no glow.
 
-Bahnschrift, Consolas and Georgia exist on every supported Windows. Segoe UI Light and Segoe UI Semibold
-are named as families of their own; the plan checks each name against the installed-font list the
-validator reads, and a name that list does not hold is replaced before the look is written. No look names
-a font that exists only on Windows 11.
+WPF lists Segoe UI as one family; weights are not families there, so no look names Segoe UI Light or
+Segoe UI Semibold (checked 2026-11-20). Every font a look or its fallback names is in
+`DeskLook.WindowsFonts`, the families that ship with every supported Windows, or is bundled; a test holds
+that, and another checks each name against this PC's own list.
 
 ## 4. Fitting a look to this PC
 
@@ -104,7 +106,8 @@ a font that exists only on Windows 11.
 fitted design and a list of notes out. It runs before a look is drawn on a card and before it is applied.
 
 1. **Font.** If the design's font is neither installed nor bundled, the design takes `font_fallback`.
-   Note: "Uses Segoe UI on this PC."
+   Note: "Uses Segoe UI on this PC." When the fallback is missing too, the design takes the system
+   font, with its note.
 2. **Ink.** For each shown piece that takes the ink, the contrast the validator would judge:
    - As designed: keep it when every piece reaches 3:1.
    - Otherwise turn the plate on and judge again. Note: "Uses its plate on your wallpaper."
@@ -112,6 +115,8 @@ fitted design and a list of notes out. It runs before a look is drawn on a card 
      your wallpaper."
 3. **No wallpaper summary** (the picture could not be read): the look is used as designed, which is what
    the validator does with no summary.
+
+The fit is judged over the Desk as it is, so the user's labelled Launcher buttons count.
 
 The contrast judgement is the validator's own. `DeskDesignValidator.CheckContrast` is split so that the
 part that judges one design against one wallpaper is callable from `DeskLookFit`; there is one
@@ -126,14 +131,19 @@ A look's ink of `auto` is never adjusted: it follows the wallpaper by definition
 
 `DeskDesignService.ApplyLook(id)`, a new public method beside `SwitchTo`:
 
-1. Refuse quietly when the service is disposed or Reset has run. Dismiss an open review.
-2. Fit the look.
-3. If the Desk already is that fitted look, answer "<name> is your Desk already." and change nothing.
-4. Save the current Desk first (rule A below).
-5. Write the fitted design through the existing `WriteDesign`.
-6. If the Desk is off, switch it on. It comes on already drawing the look.
-7. Point Put my Desk back at the saved Desk (when step 4 saved one), tell the host, and answer "<name> is
-   on your Desk.", with "The Desk was switched on." appended when step 6 did anything.
+1. Disposed, or Reset has run: "Sanduhr is closing." An unknown id: "That look is gone." A drawers review
+   is open: "Finish the drawers review on your Desk first." A design under review is dismissed.
+2. Fit the look to this PC.
+3. The Desk already is exactly that fit: with the Desk on, "<name> is your Desk already."; with it off,
+   switch it on and answer "<name> is on your Desk. The Desk was switched on."
+4. Rule A: unless the Desk is an untouched built-in look, save it first ("Before <name>", or the saved
+   design that already is that Desk). A save that fails stops here: "The Desk could not be saved first, so
+   nothing was changed."
+5. Write the fitted design through the existing `WriteDesign`, its layout in the file's own order, each
+   piece on the monitor the user gave it (`DeskLookFit.LayoutOver`), not merged.
+6. Switch the Desk on if it was off: `desk_enabled`, and setup's "A nicer desktop".
+7. Rule B: no `KeepApplied`. Point Put my Desk back at what step 4 saved, when it saved; tell the host;
+   answer "<name> is on your Desk." and, when step 6 did anything, " The Desk was switched on."
 
 A failure to save the current Desk stops before anything is written, as it does for a design today.
 
@@ -168,7 +178,8 @@ a Desk. Put my Desk back does not switch it off again; the Desk switch stays the
 
 ### In Settings
 
-A new section, **Looks**, at the top of Settings, Desk, above Pieces. Its jump link is first. No new page.
+A new section, **Looks**, on Settings, Desk, under the Desk switch and above Pieces. Its jump link is
+first. No new page.
 
 - A heading line: "Looks", with **Put my Desk back** at its right, enabled when there is a Desk to go
   back to. It is the same command as the button in Designs and the tray item.
@@ -181,16 +192,18 @@ Settings search finds the section under "looks", "gallery", "presets" and "style
 ### A card
 
 - **Top:** a crop of the user's wallpaper. Over it, the look's name in the fitted look's font and ink,
-  with its plate and glow when it has them, and the piece map in the same ink. The map is drawn by the
+  with its plate and glow when it has them, standing where the look puts its clock, and the piece map in
+  the same ink. The map is drawn by the
   layout code `DeskLayoutMap` already uses (`DeskArrangement.Stacks`, `DeskGeometry`), for one screen.
 - **Bottom:** the blurb, then at most two notes, in this order: the fit notes from section 4, then what a
   shown piece needs.
 - **The look that is the Desk now** carries "On your Desk" and a check mark.
 
-**What a shown piece needs.** One line, naming every piece the look shows that has nothing to draw:
-"Weather needs a place." "The Launcher needs buttons." "Watchers needs a watcher." Each is a link to that
-piece's Settings page. The Claude line and the meters are not listed: they say so themselves on the Desk
-when no one is signed in.
+**What a shown piece needs.** One note, naming every piece the look shows that has nothing to draw:
+"Weather needs a place." "The Launcher needs buttons." "Watchers needs a watcher." Every sentence is kept.
+It is drawn as one wrapping run of links under the card, outside the button, each sentence a link to that
+piece's Settings page. It shows when the fit's notes left a line free. The Claude line and the meters are
+not listed: they say so themselves on the Desk when no one is signed in.
 
 **The wallpaper crop.** Read through the reader `WallpaperInk` already uses, scaled down once and held in
 memory; made again when the wallpaper changes. Nothing is written to disk. When the picture cannot be read
@@ -203,6 +216,10 @@ The theme gallery is a list where selecting an item applies it. For looks, arrow
 would rewrite the Desk on every step. So each card is a button:
 
 - Tab and the arrow keys move focus only. Enter, Space, a click or UI Automation's Invoke applies.
+- Tab reaches the row of cards as one stop, and the arrow keys move between the cards and the links under
+  them. Neither applies a look. The Settings redesign's guard "Tab reaches Pieces from the Desk page's
+  first stop in under 10" is re-pinned to 11, because the Looks section, with its own jump link and Put my
+  Desk back, sits above Pieces. This is the owner's to confirm.
 - Accessible name: "<name> look. <blurb> <notes>" and, on the current one, "On your Desk." The name
   changes when the state does.
 - The row has an accessible name, "Ready-made looks".
@@ -213,6 +230,10 @@ would rewrite the Desk on every step. So each card is a button:
 Under the "A nicer desktop" tile, beside "Design it with your AI chat": **Start with a look**, a row of
 the six cards at a smaller size (name over the wallpaper crop and the blurb; no notes).
 
+- The six cards are one strip, a single row scrolled sideways (the mouse wheel over it scrolls it
+  sideways), not a wrapped row. Wrapped two per row, they added about 500 DIPs to a fixed-width,
+  non-resizable window and pushed Continue off a 1280 by 720 DIP screen. The setup window is capped at the
+  screen's work area: its choices sit in a scroll area and Continue sits outside it.
 - Enabled only while the tile is ticked.
 - Picking a card marks it; picking it again clears it. Nothing changes until Continue, like every other
   setup choice.
@@ -234,8 +255,8 @@ a gradient. (`DropShadowEffect`, which the message's glow uses, glows in one col
 - **Strength**, 0.2 to 1.0, default 0.6: the blur radius runs from 6 to 22 DIPs and the copy's opacity
   from 0.45 to 0.9.
 - **Room.** An island's window has 16 DIPs of padding (`DesktopLayerHost.Pad`). While the glow is on, the
-  padding is the larger of 16 and the blur radius plus 4, so the glow is not clipped. With the glow off,
-  nothing changes.
+  padding is the larger of 16 and the blur radius plus 4, so the glow is not clipped: 16 at strength 0.2 and
+  26 at 1.0. With the glow off, nothing changes.
 - **With the plate on,** the glow draws between the plate and the ink.
 - **OLED care** dims and drifts the glow with the piece, because the glow is part of the piece.
 - The glow does not count toward the contrast rule, which judges the ink against the wallpaper.
@@ -246,13 +267,22 @@ With "Desktop icons" drawing over the Desk, `UnderIconsHost` renders each island
 `RenderTargetBitmap` and copies the pixels. Effects cost more there, and a clock redraws every second or
 every minute.
 
-The plan's first task measures it on Neb: the time to capture the clock's island with the glow at
-strength 1.0.
+The plan's first task measures it: the time to capture the clock's island with the glow at strength 1.0.
 
 - **Under 8 ms:** the Desk under the icons draws the same glow.
 - **8 ms or more:** the Desk under the icons draws the glow with a `DropShadowEffect` at depth 0 in the
   ink's middle color, and the normal Desk keeps the blurred copy. Desk Look says so beside the switch:
   "Under the desktop icons the glow is one color."
+
+**Measured, 2026-11-20.** One software capture of the clock's island at strength 1.0, median of 21, three
+runs on the owner's PC, the test process reading the display scale as 1.00: no glow 1.95 ms, blurred copy
+8.54 ms, one-color glow 6.34 ms. The blurred copy is over the 8 ms budget, so
+`DeskGlowLayer.UnderIconsOneColor` is `true`: under the desktop icons the glow is one color, above them it
+is the blurred copy. A test process is not DPI aware, so a scaled display has more pixels and costs the
+same or more.
+
+The glow covers a followed widget theme's ink. Launcher labels glow in one color. Drawer labels neither
+glow nor keep their shadow while the glow is on. `desk_ink` is written as before while the glow is off.
 
 The glow is static, so nothing needs `InkWake`.
 
@@ -304,20 +334,23 @@ built-in looks in 5.0.
 ## 9. Errors
 
 - **A look file that does not parse or breaks a rule** cannot ship: a test loads every embedded look. At
-  run time a bad file is skipped and logged, and the gallery shows the others.
+  run time a bad file is skipped and named in the app's log file by the design service
+  (`LogSkippedLooks`), since debug output is dropped in a shipped build. The gallery shows the others.
 - **The current Desk cannot be saved:** nothing is written; the status line says "The Desk could not be
   saved first, so nothing was changed."
 - **The design cannot be written:** the status line says so with the exception's type, as `SwitchTo` does.
 - **The wallpaper cannot be read:** the look is used as designed and the card falls back to a color.
 - **The glow fails to draw on a piece** (an exception building the copy): that piece draws without it and
-  the failure is logged once. A glow is never worth a missing piece.
+  the failure is written to debug output once, as the Desk's other drawing failures are. It does not reach
+  the log file. A glow is never worth a missing piece.
 
 ## 10. Testing
 
 **Core**
 
-- Every look file: parses; passes `DeskDesign.Validate`; names every drawn piece; carries none of the
-  must-not fields; names a fallback from the list of fonts present on build 17763.
+- Every look file (this test lives in the App tests, where the files are embedded): parses; passes
+  `DeskDesign.Validate`; names every drawn piece; carries none of the must-not fields; names a fallback
+  from the list of fonts present on build 17763.
 - `DeskLookFit` over fixture wallpapers (dark, light, mid-grey, busy, and two monitors of opposite
   brightness): the result always passes the validator; the three ink steps each occur in some fixture;
   the notes match the step taken; an `auto` ink is never changed.
@@ -332,6 +365,8 @@ built-in looks in 5.0.
 - `ApplyLook` with a fake store: applying A then B then C saves one design; Put my Desk back returns to
   the first Desk, and a second press changes nothing; no built-in appears in the saved designs; a changed
   look is saved when replaced; the Desk is switched on when it was off; a failed save writes nothing.
+- Every shipped look, applied and read back, is recognised as itself on every fixture wallpaper. The test
+  lives in the App suite, and its round trip uses the same calls the App's `ApplyLook` makes.
 - `SwitchTo` between two of the user's own designs still toggles with Put my Desk back.
 - The Looks section: six buttons with their accessible names; focus moves without applying; the current
   look is marked; the status line is a live region; the jump link and the search words.

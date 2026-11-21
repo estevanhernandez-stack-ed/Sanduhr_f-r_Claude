@@ -397,3 +397,21 @@ from their own art does that with Claude outside Sanduhr; Sanduhr just uses the 
 - Unread: the manifest (`626Labs.Sanduhr.nuspec`) of an x64 package packed on an Arm machine. The
   installed record (`sq.version`) is the same as a PC-packed one. One line in the Arm check's `built`
   job that prints the manifest's rid and machine architecture settles it.
+
+## #11 — Desk looks and the glow follow-ups (5.0 spec 5)
+
+- **For the Mac agent: the Desk design field `glow` (Windows 5.0).** `false`, `true` (on at the strength already set) or a number from
+  0.2 to 1.0; on with `shadow: true` is refused. Stored on Windows as `desk_ink.glow` and `desk_ink.glow_strength`. The Mac's MCP
+  refuses the field today, as it refuses every field the Mac does not draw. Nothing to do unless the Mac ever draws a glow.
+- **After 5.0: looks that bring their own wallpaper** (dashboard task `task-1795192163146-ab9ypxtf5`). The look file's wrapper
+  ignores unknown fields, so a `wallpaper` member can be added without breaking a 5.0 build.
+- **Parked from the looks plan:** an agent's design applied over an untouched look still saves "Before <name>" (rule A covers looks
+  and Switch to only); a preview on hover; the user's own looks in the gallery.
+- **Flaky App tests seen once each on the looks branch, all unrelated to it and all passing on a rerun:**
+  StreamerPrivacyTests.Shuffle_asks_first_and_cancel_changes_nothing, ShellFilesTests.Thumbnail_gives_a_frozen_image_for_a_text_file,
+  McpLaunchProbeTests (one test), beside the known CodexUsageServiceTests.After_reset_a_callback_does_no_io.
+- **Parked from the looks build:** in Arrange Desk the name placeholder of an empty message, now playing, Launcher or companion
+  piece gets neither glow nor shadow; the message's "Glow around the message" box on Desk Look is stale until the page is shown
+  again when a look changes the glow while that page is open; a font installed while Settings is open refits the looks but the
+  cards keep drawing the old family until Settings is reopened; setup shows two or three looks at a time (three per row would need
+  smaller cards).
