@@ -173,6 +173,9 @@
                        Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
             <ScrollViewer x:Name="LooksStrip" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Focusable="False"
                           PreviewMouseWheel="LooksStrip_PreviewMouseWheel">
+                <ScrollViewer.Resources>
+                    <Style TargetType="ScrollBar" BasedOn="{StaticResource SlimThemeScrollBar}" />
+                </ScrollViewer.Resources>
             <views:DeskLooksRow ItemsSource="{Binding Looks}" Focusable="False" Margin="0,0,0,6"
                           KeyboardNavigation.DirectionalNavigation="Contained" KeyboardNavigation.TabNavigation="Once">
                 <ItemsControl.ItemsPanel>

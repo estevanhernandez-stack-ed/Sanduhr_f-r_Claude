@@ -7,12 +7,13 @@ using System.Windows.Threading;
 using Sanduhr.App.Desk;
 using Sanduhr.Core;
 using Rectangle = System.Windows.Shapes.Rectangle;
+using Xunit.Abstractions;
 
 namespace Sanduhr.App.Tests;
 
 /// <summary>The neon glow's drawing helper (5.0 spec 5, section 7): a blurred copy of a piece behind it, or one color where the copy
 /// costs too much.</summary>
-public sealed class DeskGlowLayerTests
+public sealed class DeskGlowLayerTests(ITestOutputHelper output)
 {
     private static ResolvedInk Ink(double glow, bool oneColor = false) =>
         DeskInk.Resolve(new DeskInkSettings(DeskInkMode.Custom, "8f5bd6,3a63e0,33fdff", false, glow > 0, glow > 0 ? glow : 0.6), null, null)
@@ -43,6 +44,29 @@ public sealed class DeskGlowLayerTests
         rtb.CopyPixels(px, w * 4, 0);
         return (px, w, h);
     }
+
+    /// <summary>Whether this machine's bitmap renderer (<see cref="RenderTargetBitmap"/>, WPF's software path) draws the effect: a 40 by 40
+    /// white square under it, any pixel 6 beyond the square's edge with alpha above 0. The hosted Arm runner drew no blur here (CI, 2026-11-21).</summary>
+    private static bool BitmapDraws(Effect effect)
+    {
+        const double pad = 20, side = 40;
+        var square = new Rectangle { Width = side, Height = side, Fill = Brushes.White, Effect = effect };
+        var (px, w, h) = Render(square, pad);
+        int x = (int)(pad - 6), y = h / 2;
+        int[] probes = [(y * w + x) * 4 + 3, (y * w + (int)(pad + side + 6)) * 4 + 3, (x * w + w / 2) * 4 + 3, ((int)(pad + side + 6) * w + w / 2) * 4 + 3];
+        return probes.Any(i => px[i] > 0);
+    }
+
+    private static bool DrawsBlur() { bool r = false; Sta.Run(() => r = BitmapDraws(new BlurEffect { Radius = 10 })); return r; }
+
+    private static bool DrawsDropShadow() { bool r = false; Sta.Run(() => r = BitmapDraws(new DropShadowEffect { ShadowDepth = 0, BlurRadius = 10, Color = Colors.White, Opacity = 1 })); return r; }
+
+    /// <summary>Never fails: it says what this machine's bitmap renderer does, so a CI log tells us what the Arm runner does.</summary>
+    [Fact]
+    public void Effects_in_a_bitmap_are_reported() =>
+        output.WriteLine($"EFFECTS IN BITMAP: blur {DrawsBlur()}, drop shadow {DrawsDropShadow()}, process architecture {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+
+    private const string NoBlur = "this machine's bitmap renderer does not draw BlurEffect (seen on the Arm runner)";
 
     [Fact]
     public void No_glow_leaves_the_piece_alone() => Sta.Run(() =>
@@ -107,9 +131,10 @@ public sealed class DeskGlowLayerTests
     [InlineData(new string[0], "ffffff")]
     public void The_middle_color_of_an_ink(string[] stops, string want) => Assert.Equal(want, DeskGlowLayer.Middle(stops));
 
-    [Fact]
+    [SkippableFact]
     public void The_glow_spills_past_the_ink_and_a_gradient_glows_as_a_gradient() => Sta.Run(() =>
     {
+        Skip.IfNot(DrawsBlur(), NoBlur);
         double pad = DeskGlow.Pad(1.0);
         var plain = Render(Piece(), pad);
         var lit = Render(DeskGlowLayer.Wrap(Piece(), 1.0), pad);
@@ -136,9 +161,10 @@ public sealed class DeskGlowLayerTests
         Assert.True((double)rightG / rightA > (double)leftG / leftA + 0.15, "the right of the glow is not greener than the left");
     });
 
-    [Fact]
+    [SkippableFact]
     public void The_padding_holds_the_whole_glow() => Sta.Run(() =>
     {
+        Skip.IfNot(DrawsBlur(), NoBlur);
         var (px, w, h) = Render(DeskGlowLayer.Wrap(Piece(), 1.0), DeskGlow.Pad(1.0));
         // Nothing reaches the bitmap's outermost row or column: the glow fades out inside its room.
         for (int x = 0; x < w; x++)

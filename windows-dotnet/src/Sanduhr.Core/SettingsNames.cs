@@ -17,6 +17,13 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 /// </summary>
 public static class SettingsNames
 {
+    // ---- Slim scroll bar (its invisible track buttons are controls, so they read as words) ----
+
+    public const string ScrollPageUp = "Page up";
+    public const string ScrollPageDown = "Page down";
+    public const string ScrollPageLeft = "Page left";
+    public const string ScrollPageRight = "Page right";
+
     // ---- Local burn ledger (spec 3) ----
 
     /// <summary>A stacked project row whose sessions come from more than one agent.</summary>

@@ -403,6 +403,10 @@ from their own art does that with Claude outside Sanduhr; Sanduhr just uses the 
 - **For the Mac agent: the Desk design field `glow` (Windows 5.0).** `false`, `true` (on at the strength already set) or a number from
   0.2 to 1.0; on with `shadow: true` is refused. Stored on Windows as `desk_ink.glow` and `desk_ink.glow_strength`. The Mac's MCP
   refuses the field today, as it refuses every field the Mac does not draw. Nothing to do unless the Mac ever draws a glow.
+- **Unchecked on Arm: effects in a bitmap capture.** On the hosted Arm runner, WPF's software renderer did not draw the glow's
+  blur into a bitmap (CI, 2026-11-21); the x64 runner did. The Desk under the desktop icons is drawn by such a capture, so on an
+  Arm PC the glow, and possibly the drop shadow, may be missing under the icons. The test output line "EFFECTS IN BITMAP" says
+  what each runner does. Needs a look on a real Arm PC.
 - **After 5.0: looks that bring their own wallpaper** (dashboard task `task-1795192163146-ab9ypxtf5`). The look file's wrapper
   ignores unknown fields, so a `wallpaper` member can be added without breaking a 5.0 build.
 - **Parked from the looks plan:** an agent's design applied over an untouched look still saves "Before <name>" (rule A covers looks

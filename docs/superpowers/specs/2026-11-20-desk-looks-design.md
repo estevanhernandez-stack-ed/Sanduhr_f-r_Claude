@@ -266,7 +266,9 @@ a gradient. (`DropShadowEffect`, which the message's glow uses, glows in one col
 
 With "Desktop icons" drawing over the Desk, `UnderIconsHost` renders each island in software through a
 `RenderTargetBitmap` and copies the pixels. Effects cost more there, and a clock redraws every second or
-every minute.
+every minute. Unchecked: on the hosted Arm runner this software renderer did not draw the glow's blur into a bitmap
+(CI, 2026-11-21), so on an Arm PC the glow, and possibly the drop shadow, may be missing under the icons; the "EFFECTS
+IN BITMAP" line in the test output says what each runner does, and a real Arm PC still needs a look.
 
 The plan's first task measures it: the time to capture the clock's island with the glow at strength 1.0.
 

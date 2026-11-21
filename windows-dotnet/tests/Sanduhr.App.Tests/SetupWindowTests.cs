@@ -556,6 +556,43 @@ public sealed class SetupWindowTests : AppWindowFixture
     });
 
     [Fact]
+    public void On_a_small_screen_every_scroll_bar_part_has_a_name() => WithSixLooks(w =>
+    {
+        w.MaxHeight = 500;
+        w.Show();
+        w.UpdateLayout();
+        Assert.True(Named<System.Windows.Controls.ScrollViewer>(w, "SetupScroller").ScrollableHeight > 0, "the tiles scroll, so their bar shows");
+        Assert.True(Named<System.Windows.Controls.ScrollViewer>(w, "LooksStrip").ScrollableWidth > 0, "the strip overflows, so its bar shows");
+        var clickable = Walk(UIElementAutomationPeer.CreatePeerForElement(w))
+            .Where(p => p.GetAutomationControlType() is AutomationControlType.Button or AutomationControlType.CheckBox or AutomationControlType.Hyperlink)
+            .ToList();
+        Assert.Empty(clickable.Where(p => string.IsNullOrWhiteSpace(p.GetName())).Select(p => p.GetType().Name));
+        var names = clickable.Select(p => p.GetName()).ToList();
+        foreach (var part in new[] { SettingsNames.ScrollPageUp, SettingsNames.ScrollPageDown, SettingsNames.ScrollPageLeft, SettingsNames.ScrollPageRight })
+            Assert.Contains(part, names);
+    });
+
+    [Fact]
+    public void A_first_run_with_a_capped_window_still_names_every_control() => AppHost.Run(() =>
+    {
+        var vm = Model(new SettingsStore(ScratchPaths()), firstRun: true);
+        var w = new SetupWindow(vm) { MaxHeight = 300 };
+        OffScreen(w);
+        w.Show();
+        try
+        {
+            w.UpdateLayout();
+            Assert.True(Named<System.Windows.Controls.ScrollViewer>(w, "SetupScroller").ScrollableHeight > 0, "the bar shows");
+            var unnamed = Walk(UIElementAutomationPeer.CreatePeerForElement(w))
+                .Where(p => p.GetAutomationControlType() is AutomationControlType.Button or AutomationControlType.CheckBox or AutomationControlType.Hyperlink)
+                .Where(p => string.IsNullOrWhiteSpace(p.GetName()))
+                .Select(p => p.GetType().Name).ToList();
+            Assert.Empty(unnamed);
+        }
+        finally { w.Close(); }
+    });
+
+    [Fact]
     public void The_wheel_over_the_strip_scrolls_it_sideways_and_is_not_swallowed() => WithSixLooks(w =>
     {
         w.Show();
