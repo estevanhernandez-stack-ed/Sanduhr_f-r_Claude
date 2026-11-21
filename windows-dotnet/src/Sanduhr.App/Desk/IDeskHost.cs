@@ -28,6 +28,10 @@ internal sealed record DeskIsland(FrameworkElement Content, Point Anchor, Horizo
     /// <summary>The widget words of the pieces in this stack ("telemetry", "nowPlaying", ...).</summary>
     public IReadOnlyList<string> Widgets { get; init; } = [];
 
+    /// <summary>The room the host leaves around the island, in DIPs: for the ink's shadow, and more while the neon glow is on
+    /// (<see cref="DeskGlow.Pad"/>), so the glow is not clipped by the island's window. A Glass drawer has none whatever this says.</summary>
+    public double Pad { get; init; } = DeskGlow.BasePad;
+
     /// <summary>The island holds a piece that takes clicks (spec 7.4): its window drops
     /// <c>WS_EX_TRANSPARENT</c>, so its drawn pixels take the mouse while fully transparent ones still pass
     /// it to the desktop. False keeps the whole window click-through, as before.</summary>

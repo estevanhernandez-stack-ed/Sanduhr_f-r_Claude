@@ -295,7 +295,23 @@ internal static class DeskMessagePiece
             MaxWidth = Math.Max(100, width),
             HorizontalAlignment = align,
         };
-        if (MessageMotion.Glows(e, s.Glow))
+        // Neon glow (5.0 spec 5) covers the message: each line glows in its own colors, drawn as every piece's glow is.
+        // A line that says {noglow} still wins, and then it has no shadow either, since the Desk draws no shadow while glowing.
+        bool neon = ink.Glow > 0 && e.Glow != false;
+        System.Windows.Shapes.Rectangle? copy = null;
+        if (neon)
+        {
+            try
+            {
+                if (ink.GlowOneColor) block.Effect = DeskGlowLayer.OneColor(glowHex ?? stops[stops.Count / 2], ink.Glow);
+                else copy = DeskGlowLayer.Copy(block, ink.Glow);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NotSupportedException)
+            {
+                DeskGlowLayer.Failed(ex);
+            }
+        }
+        else if (ink.Glow <= 0 && MessageMotion.Glows(e, s.Glow))
             block.Effect = new DropShadowEffect
             {
                 Color = DeskView.Rgb(glowHex ?? stops[stops.Count / 2]),
@@ -307,6 +323,7 @@ internal static class DeskMessagePiece
             block.Effect = DeskView.Shadow(ink);
 
         var host = new Grid { HorizontalAlignment = align };
+        if (copy is not null) host.Children.Add(copy);
         host.Children.Add(block);
         bool reduce = ReduceMotion;
         if (MessageMotion.AnimatesWrite(e, reduce) && played.Add("write\n" + raw)) Write(block);

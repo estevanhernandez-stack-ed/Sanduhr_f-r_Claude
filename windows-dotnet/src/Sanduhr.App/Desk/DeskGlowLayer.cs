@@ -53,10 +53,11 @@ internal static class DeskGlowLayer
     /// <summary>The piece with its blurred copy under it.</summary>
     public static GlowHost Wrap(FrameworkElement piece, double strength)
     {
+        var copy = Copy(piece, strength);   // first: if this throws, the piece keeps its tag and its effect
         var host = new GlowHost { HorizontalAlignment = piece.HorizontalAlignment, Tag = piece.Tag };
         piece.Tag = null;
         piece.Effect = null;
-        host.Children.Add(Copy(piece, strength));
+        host.Children.Add(copy);
         host.Children.Add(piece);
         return host;
     }
