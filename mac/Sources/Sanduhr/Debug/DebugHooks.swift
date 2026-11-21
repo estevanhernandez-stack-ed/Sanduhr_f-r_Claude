@@ -61,6 +61,13 @@ enum DebugHooks {
             finish(dir, error: "hot-key refused: \(SanduhrHotKeys.check(combo ?? s.defaultCombo, for: s)!.note)")
         case .action(.widgetRemove(let id), _) where !removable(id):
             finish(dir, error: "widget-remove: \(id) is not an installed made-here pack")
+        case .action(.sources(let steps), _):
+            // The Sources group's refusals (a color that is not hex, Primary on a source that is off) are the error.
+            if let refusal = app.applySourcesForSmoke(steps) {
+                finish(dir, error: refusal)
+            } else {
+                perform(.sources(steps), app: app) { finish(dir) }
+            }
         case .action(let action, _):
             perform(action, app: app) { finish(dir) }
         }
@@ -138,8 +145,10 @@ enum DebugHooks {
             DeskController.shared.applyPill()
         case .justTheDesk(let on):
             app.setUsageForSmoke(!on)
-        case .setup(let desktop, let usage):
-            app.applySetupForSmoke(desktop: desktop, usage: usage)
+        case .setup(let desktop, let usage, let codex):
+            app.applySetupForSmoke(desktop: desktop, usage: usage, codex: codex)
+        case .sources:
+            break    // handled in handle(), where a refusal can become the error
         case .drawers(let step):
             // Only against a stand-in Desktop: without the override a smoke run would sort, or
             // put back, the real Desktop's files.
@@ -452,6 +461,17 @@ enum DebugHooks {
                            notchMeters: desk.model.claudeCompact != nil, accounts: vm.accountLabels.count,
                            usageRows: vm.demo ? settings.usagePage.meterRows.count : 0)
         s.resetDryRun = resetDryRun
+        let sourceSetup = SetupStore.load()
+        s.sources = SourcesDebug.of(setup: sourceSetup, settings: AgentSourceSettings.load(),
+                                    consent: MCPAgentConsent.load())
+        s.codex = CodexDebug.of(app.codexUsage)
+        s.widgetSources = WidgetSourcesDebug.of(app.widgetSourceLayout())
+        let display = app.menuBarDisplay()
+        s.menuBarDisplay = MenuBarDisplayDebug(text: display.reading?.text, tooltip: display.tooltip)
+        s.footer = vm.footerText()
+        let vaultService = VaultService.standard
+        s.vaultAgents = VaultAgentDebug.rows(roots: vaultService.reader.agentRoots(),
+                                             meta: { vaultService.store.loadMeta($0.rawValue) })
         let meters = settings.usagePage
         s.meterHistory = MeterHistoryDebug(all: meters.metersAll && KeychainStore.accounts.labels.count > 1, window: meters.metersWindow.rawValue,
                                            rows: meters.meterRows.count, series: meters.meterRows.reduce(0) { $0 + $1.series.count })

@@ -444,15 +444,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applySetupForSmoke(desktop: on ? nil : true, usage: on)
     }
 
-    /// The smoke hook's `setup`: the desktop and usage ticks it names, applied the way Continue
+    /// The smoke hook's `setup`: the desktop, usage and Codex ticks it names, applied the way Continue
     /// applies them. Drawers stay as they are, so a hook never moves a file.
-    func applySetupForSmoke(desktop: Bool?, usage: Bool?) {
+    func applySetupForSmoke(desktop: Bool?, usage: Bool?, codex: Bool? = nil) {
         let host = AppSetupHost(usage: viewModel, confirm: { _ in true })
         let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
         var choices = service.current()
         if let desktop { choices.desktop = desktop }
         if let usage { choices.claudeUsage = usage }
+        if let codex {
+            // No stored setup reads as Claude on, so a first Codex tick must not turn it off (as the Sources switch).
+            if SetupStore.load() == nil, usage == nil { choices.claudeUsage = true }
+            choices.codexUsage = codex
+        }
         afterSetup(service.apply(choices))
+    }
+
+    /// The smoke hook's `sources`: each word through `SourcesSettingsModel`, built and wired as the Sources group
+    /// builds it, so a change lands as a click would. The first refusal is the error; nil when all applied.
+    func applySourcesForSmoke(_ steps: [DebugAction.SourcesStep]) -> String? {
+        let host = AppSetupHost(usage: viewModel, confirm: { _ in false })
+        let service = SetupService(storage: .defaults(setup: UserDefaults.standard, desk: UserDefaults.desk), host: host)
+        let model = SourcesSettingsModel(
+            service: service, hasVaultRoot: { VaultService.standard.reader.agentRoots().contains($0) })
+        model.onApplied = { [weak self] in self?.afterSetup($0) }
+        model.onChanged = { NotificationCenter.default.post(name: .sanduhrSourcesDidChange, object: nil) }
+        model.onConsentChanged = { [weak viewModel] in viewModel?.reloadAccounts() }
+        return DebugSources.apply(steps, to: model)
+    }
+
+    /// What the menu bar shows now (text and tooltip): the status item renders this, and the smoke state reads it.
+    func menuBarDisplay() -> MenuBarDisplay {
+        let setup = SetupStore.load()
+        let sources = AgentSourceSettings.load()
+        return MenuBarText.display(
+            primary: sources.primary(setup: setup),
+            claude: viewModel.usage, claudeOn: viewModel.usageOn,
+            codex: codexUsage.codexUsage, codexOn: sources.isOn(.codex, setup: setup),
+            codexFresh: codexUsage.freshTiers, mode: .saved(), step: menuBarStep)
+    }
+
+    /// The widget's source layout as the root view builds it now (WidgetSourcesInput.live).
+    func widgetSourceLayout() -> WidgetSourceLayout {
+        widgetSources.reload()
+        return WidgetSources.build(.live(vm: viewModel, sources: widgetSources, codex: codexUsage, now: Date()))
     }
 
     /// Shows or hides the widget as WidgetVisibilityRule says for `event`; leaves it alone when
@@ -572,13 +607,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// (MenuBarText: the session, the weekly limit, the higher of the two, or both in turn).
     func renderStatusItem() {
         guard let button = statusItem?.button else { return }
-        let setup = SetupStore.load()
-        let sources = AgentSourceSettings.load()
-        let display = MenuBarText.display(
-            primary: sources.primary(setup: setup),
-            claude: viewModel.usage, claudeOn: viewModel.usageOn,
-            codex: codexUsage.codexUsage, codexOn: sources.isOn(.codex, setup: setup),
-            codexFresh: codexUsage.freshTiers, mode: .saved(), step: menuBarStep)
+        let display = menuBarDisplay()
         // Only with another source further out, or a stale Codex primary; a Claude-only Mac has none.
         button.toolTip = display.tooltip
 

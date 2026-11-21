@@ -343,9 +343,9 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "oled_care", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "plan", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "setup", "reset_dry_run"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "setup", "reset_dry_run", "sources", "codex", "widget_sources", "menu_bar_display", "footer", "vault_agents"])
         #expect(yaml.contains("just_the_desk: false\ndemo:\n"))
-        #expect(yaml.hasSuffix("\nreset_dry_run: null\n"))
+        #expect(yaml.contains("\nreset_dry_run: null\nsources:\n"))
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
         #expect(yaml.contains("hot_keys:\n  join: true\n  settings: true\n  registered: 0\n  join_keys: ⌥J\n  settings_keys: ⌥S\n  join_taken: false\n  settings_taken: false\n"))
         #expect(yaml.contains("  settings_clash: null\n  check_app_menus: false\n  app_menus_trusted: false\nmeter_history:"))
@@ -542,8 +542,10 @@ struct DebugStateTests {
         #expect(parsed("desktop=on usage=off") == .setup(desktop: true, usage: false))
         #expect(parsed("usage=on") == .setup(desktop: nil, usage: true))
         #expect(parsed("DESKTOP=OFF") == .setup(desktop: false, usage: nil))
+        #expect(parsed("codex=on") == .setup(desktop: nil, usage: nil, codex: true))
+        #expect(parsed("usage=on codex=off desktop=on") == .setup(desktop: true, usage: true, codex: false))
         for arg in [nil, "", "drawers=on", "desktop=on drawers=off", "desktop", "desktop=maybe", "usage=on usage=off",
-                    "claude=on", "desktop=true", "on", "Private Stuff"] {
+                    "claude=on", "desktop=true", "on", "Private Stuff", "codex=on codex=off", "codex=maybe"] {
             #expect(parsed(arg) == nil, "accepted \(arg ?? "nil")")
         }
         if case .failure(let e) = DebugLink.action("setup", arg: "drawers=on") {

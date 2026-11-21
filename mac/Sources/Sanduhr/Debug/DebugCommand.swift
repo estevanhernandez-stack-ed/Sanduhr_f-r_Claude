@@ -42,8 +42,23 @@ enum DebugAction: Equatable {
     /// applies that the way Continue does; `off` ticks usage again. Applied live.
     case justTheDesk(on: Bool)
     /// Set up Sanduhr's ticks, applied through the setup service as Continue applies them: desktop
-    /// and Track my AI usage, either or both (nil leaves it as it is). Drawers are never touched here.
-    case setup(desktop: Bool?, usage: Bool?)
+    /// and Track my AI usage, plus Codex's tick (2.46.0), any of them (nil leaves it as it is). Drawers are
+    /// never touched here.
+    case setup(desktop: Bool?, usage: Bool?, codex: Bool? = nil)
+    /// Settings, Usage, Sources (2.46.0): the words in order, each applied through `SourcesSettingsModel` as
+    /// the Sources group applies it. A refusal the group shows is the action's error.
+    case sources([SourcesStep])
+
+    enum SourcesStep: Equatable {
+        /// Antigravity's activity-only switch.
+        case antigravity(Bool)
+        /// Primary, among the sources with limits that are on (Claude or Codex).
+        case primary(AgentSource)
+        /// A source's color as `#RRGGBB`, or nil for Reset.
+        case color(AgentSource, String?)
+        /// Claude's consent to read an agent's project totals (Codex or Antigravity).
+        case mcp(AgentSource, Bool)
+    }
 
     /// Drawers (docs/mac-drawers-setup-spec.md, section 9): `on` turns it on (and the Desk), `sort`
     /// reads the Desktop and holds the review, `apply` applies the pending review, `off` puts every
@@ -142,7 +157,7 @@ enum DebugAction: Equatable {
     case widgetRemove(id: String)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "drawers", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "sources", "drawers", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config", "widget-from-file", "widget-remove"]
@@ -252,6 +267,8 @@ enum DebugLink {
             }
         case "setup":
             return setupAction(arg)
+        case "sources":
+            return sourcesAction(arg)
         case "drawers":
             guard let step = arg.flatMap({ DebugAction.DrawersStep(rawValue: $0.lowercased()) }) else {
                 return bad("drawers needs arg=on, sort, apply or off")
@@ -353,15 +370,16 @@ enum DebugLink {
         }
     }
 
-    /// `setup desktop=on usage=off`: words of key=value, each key once. Only desktop and usage can be
-    /// set; drawers has its own action and its own guard, and any other word is refused.
+    /// `setup desktop=on usage=off codex=on`: words of key=value, each key once. Only desktop, usage and
+    /// codex can be set; drawers has its own action and its own guard, and any other word is refused.
     static func setupAction(_ arg: String?) -> Result<DebugAction, Failure> {
         func bad(_ why: String) -> Result<DebugAction, Failure> { .failure(Failure(message: why)) }
-        let usage = "setup needs arg=desktop=on|off and/or usage=on|off"
+        let usage = "setup needs arg=desktop=on|off, usage=on|off and/or codex=on|off"
         let words = (arg ?? "").lowercased().split(whereSeparator: { $0 == " " || $0 == "," }).map(String.init)
         guard !words.isEmpty else { return bad(usage) }
         var desktop: Bool?
         var usageOn: Bool?
+        var codex: Bool?
         for word in words {
             let parts = word.split(separator: "=", omittingEmptySubsequences: false).map(String.init)
             guard parts.count == 2 else { return bad(usage) }
@@ -370,10 +388,50 @@ enum DebugLink {
             switch parts[0] {
             case "desktop" where desktop == nil: desktop = on
             case "usage" where usageOn == nil: usageOn = on
+            case "codex" where codex == nil: codex = on
             default: return bad(usage)
             }
         }
-        return .success(.setup(desktop: desktop, usage: usageOn))
+        return .success(.setup(desktop: desktop, usage: usageOn, codex: codex))
+    }
+
+    /// `sources antigravity=on primary=codex color=codex:#2255CC color=codex:reset mcp=codex:on`: words
+    /// of key=value, in order, a key may repeat (two colors). A color is a source and `#RRGGBB` or
+    /// `reset`, an mcp word names an agent (not Claude Code) and on or off. The words are matched
+    /// ignoring case; a color's hex is kept as typed, and `SourcesSettingsModel` refuses one that is not hex.
+    static func sourcesAction(_ arg: String?) -> Result<DebugAction, Failure> {
+        func bad(_ why: String) -> Result<DebugAction, Failure> { .failure(Failure(message: why)) }
+        let usage = "sources needs words: antigravity=on|off, primary=claude|codex, color=<source>:<#RRGGBB|reset>, mcp=<codex|antigravity>:on|off"
+        let words = (arg ?? "").split(whereSeparator: { $0 == " " || $0 == "," }).map(String.init)
+        guard !words.isEmpty else { return bad(usage) }
+        func source(_ name: String) -> AgentSource? { AgentSource(rawValue: name.lowercased()) }
+        var steps: [DebugAction.SourcesStep] = []
+        for word in words {
+            let parts = word.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 2 else { return bad(usage) }
+            let value = parts[1]
+            switch parts[0].lowercased() {
+            case "antigravity":
+                guard let on = ["on": true, "off": false][value.lowercased()] else { return bad(usage) }
+                steps.append(.antigravity(on))
+            case "primary":
+                guard let s = source(value), s.hasLimits else { return bad("primary needs claude or codex: Antigravity has no limits") }
+                steps.append(.primary(s))
+            case "color":
+                let pair = value.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                guard pair.count == 2, let s = source(pair[0]), !pair[1].isEmpty else { return bad(usage) }
+                steps.append(.color(s, pair[1].lowercased() == "reset" ? nil : pair[1]))
+            case "mcp":
+                let pair = value.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                guard pair.count == 2, let s = source(pair[0]), s != .claude,
+                      let on = ["on": true, "off": false][pair[1].lowercased()] else {
+                    return bad("mcp needs <codex|antigravity>:on|off: Claude Code is consented per folder")
+                }
+                steps.append(.mcp(s, on))
+            default: return bad(usage)
+            }
+        }
+        return .success(.sources(steps))
     }
 
     /// A section by its raw value, ignoring case and dashes ("desk-layout" is deskLayout).
