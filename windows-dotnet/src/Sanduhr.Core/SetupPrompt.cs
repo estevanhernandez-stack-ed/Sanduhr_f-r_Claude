@@ -23,7 +23,7 @@ public static class SetupPrompt
     /// <summary>The design fields the prompt teaches. Every one is a field <see cref="DeskDesign.Parse"/> reads. The launcher (its buttons
     /// need ids from this PC's Start menu), song looks and a whole theme are not for a chat that cannot see this PC.</summary>
     public static readonly IReadOnlyList<string> DeskFields =
-        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "messages"];
+        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "glow", "messages"];
 
     /// <summary>The ink words (<see cref="DeskInkKind"/> but the custom colors), as the validator spells them.</summary>
     public static IReadOnlyList<string> InkWords { get; } =
@@ -81,6 +81,7 @@ public static class SetupPrompt
         Line("  Sanduhr refuses a color that would be hard to read on my wallpaper, so prefer auto unless I ask for colors.");
         Line($"- font: a font family name that comes with Windows, up to {DeskDesign.FontFamilyMax} characters, letters, digits and spaces. Leave it out if unsure.");
         Line("- plate: true or false, a soft panel behind each stack of pieces. shadow: true or false.");
+        Line($"- glow: true or false, or a strength from {DeskGlow.MinStrength.ToString(System.Globalization.CultureInfo.InvariantCulture)} to {DeskGlow.MaxStrength.ToString("0", System.Globalization.CultureInfo.InvariantCulture)}, a neon glow behind the text in its own colors. It replaces the shadow, so never send glow on with shadow true.");
         Line($"- messages: {{ lines: [ ... ], mode }}. mode: {DeskDesign.Word(MessageProposalMode.Add)} (join my list) or {DeskDesign.Word(MessageProposalMode.Replace)} (replace it).");
         Line($"  1 to {MessageProposal.MaxLines} lines, each plain text of at most {MessageProposal.MaxLineChars} characters on one line, with no curly braces and no colon, not starting with #.");
         Line($"- weather: {{ nickname }}, a name of up to {DeskDesign.WeatherNicknameMax} characters shown in place of the city's name.");

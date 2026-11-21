@@ -248,6 +248,9 @@ public class ToolLogicDeskDesignTests
     [InlineData("""{"name":"line one\nline two"}""", "name")]
     [InlineData("""{"looks":{"a":1}}""", "looks")]
     [InlineData("""{"command":"calc.exe"}""", "design")]
+    [InlineData("""{"glow":2}""", "glow")]
+    [InlineData("""{"glow":"neon"}""", "glow")]
+    [InlineData("""{"glow":true,"shadow":true}""", "glow")]
     public void A_bad_design_is_refused_with_its_field_and_leaves_no_request_file(string design, string field)
     {
         using var tmp = new TempDir();
@@ -808,5 +811,41 @@ public class ToolLogicDeskDesignTests
 
         WriteState(cfg, s => s["design"] = "nope");
         Assert.Null(new ToolLogic(cfg, () => Now).BuildGetDesk()["theme_look"]);
+    }
+
+    [Theory]
+    [InlineData("""{"glow":true}""")]
+    [InlineData("""{"glow":false}""")]
+    [InlineData("""{"glow":0.8,"shadow":false}""")]
+    public void A_glow_in_any_of_its_forms_is_sent_to_the_widget(string design)
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        var r = Propose(cfg, design);
+
+        Assert.Equal("queued", (string?)r["status"]);
+        Assert.True(File.Exists(cfg.DesignRequestPath!));
+    }
+
+    [Fact]
+    public void Get_reports_the_glow_the_widget_wrote()
+    {
+        using var tmp = new TempDir();
+        var cfg = DesignConfig(tmp);
+        WriteState(cfg, s => s["design"]!["glow"] = 0.8);
+
+        var r = new ToolLogic(cfg, () => Now).BuildGetDesk();
+
+        Assert.Equal(0.8, (double)r["design"]!["glow"]!);
+    }
+
+    [Fact]
+    public void The_schema_and_both_guides_teach_the_glow()
+    {
+        var tools = ToolCatalog.Build();
+        var propose = tools.Single(t => (string?)t!["name"] == "propose_desk")!;
+        Assert.NotNull(propose["inputSchema"]!["properties"]!["design"]!["properties"]!["glow"]);
+        Assert.Contains("glow (", (string?)propose["description"]);
+        Assert.Contains("shadow, glow,", (string?)tools.Single(t => (string?)t!["name"] == "get_desk")!["description"]);
     }
 }

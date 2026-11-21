@@ -291,6 +291,10 @@ public static class ToolCatalog
                             },
                             ["plate"] = new JsonObject { ["type"] = "boolean" },
                             ["shadow"] = new JsonObject { ["type"] = "boolean" },
+                            ["glow"] = new JsonObject
+                            {
+                                ["description"] = "false, true (on at the strength the user has set), or a strength from 0.2 to 1: a neon glow behind the ink, in the ink's own colors. On with shadow true is refused.",
+                            },
                             ["launcher"] = new JsonObject
                             {
                                 ["type"] = "object",
@@ -615,7 +619,7 @@ public static class ToolCatalog
         "color theme. Returns design (the current look as a full design: layout with every piece's anchor, size, " +
         "hidden, monitor and tilt (the slant of its stack in degrees, 0 upright), and for claude, meters and telemetry its style (bar, slim, ring or ticks; " +
         "limits.piece_style lists the pieces and the words), weather.nickname (the name the weather piece shows " +
-        "instead of the place's, \"\" for none), font, ink, plate, shadow, launcher, theme, follows_theme: true while the Desk draws the " +
+        "instead of the place's, \"\" for none), font, ink, plate, shadow, glow, launcher, theme, follows_theme: true while the Desk draws the " +
         "theme's look instead of its own), theme_look (that look worked out from the theme: gradient, ink, bars, message, glow, plate, " +
         "plate_color, shadow, font, bar_track, pace_tick), pieces and anchors (the allowed words), fonts (installed " +
         "families, and the bundled handwriting fonts EsteFont Pro and EsteFont 26), wallpaper (path of a copy of the wallpaper " +
@@ -647,6 +651,9 @@ public static class ToolCatalog
         "https link to get a font the user lacks: Sanduhr never downloads it, the review shows the link and Apply waits " +
         "for the font, status needs_font); ink (auto, light, dark, theme, one #rrggbb, or a list of 2 to 4 #rrggbb for a " +
         "left-to-right gradient); plate and shadow (true or false; the plate is a soft panel behind each stack of pieces); " +
+        "glow (false, true for the strength the user has set, or a strength from 0.2 to 1: a neon glow behind the ink, in the ink's own " +
+        "colors, so a gradient ink glows as a gradient; it replaces the shadow, so glow on with shadow true is refused, and it does not " +
+        "count toward the contrast rule); " +
         "launcher {orientation row or column, buttons: up to 8 of {kind app or link, target, label up to 24 characters, " +
         "glow #rrggbb}}, where an app target is an id from get_desk start_menu_apps (a button opens only what the Start " +
         "menu lists; there are no command lines) and a link target is an https link; messages {lines, mode add or " +
