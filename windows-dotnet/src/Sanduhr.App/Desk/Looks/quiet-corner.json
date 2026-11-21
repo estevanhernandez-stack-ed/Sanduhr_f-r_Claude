@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "quiet-corner",
+  "name": "Quiet corner",
+  "blurb": "A small clock and little else.",
+  "font_fallback": "Segoe UI",
+  "design": {
+    "layout": {
+      "clock": { "anchor": "bl", "size": 0.8 },
+      "claude": { "anchor": "bl", "size": 0.8 },
+      "nowPlaying": { "anchor": "bl", "size": 0.8 },
+      "message": { "hidden": true },
+      "meters": { "hidden": true },
+      "telemetry": { "hidden": true },
+      "weather": { "hidden": true },
+      "watchers": { "hidden": true },
+      "launcher": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "Corbel",
+    "ink": "auto",
+    "plate": false,
+    "shadow": true,
+    "glow": false,
+    "follows_theme": false
+  }
+}

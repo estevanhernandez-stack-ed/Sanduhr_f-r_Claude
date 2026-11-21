@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "dashboard",
+  "name": "Dashboard",
+  "blurb": "Rings, watchers and a launcher on plates.",
+  "font_fallback": "Segoe UI",
+  "design": {
+    "layout": {
+      "clock": { "anchor": "tr", "size": 1 },
+      "meters": { "anchor": "mr", "size": 1, "style": "ring" },
+      "telemetry": { "anchor": "mr", "size": 1, "style": "ring" },
+      "watchers": { "anchor": "br", "size": 1 },
+      "launcher": { "anchor": "bc", "size": 1 },
+      "message": { "hidden": true },
+      "claude": { "hidden": true },
+      "nowPlaying": { "hidden": true },
+      "weather": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "Segoe UI",
+    "ink": "auto",
+    "plate": true,
+    "shadow": true,
+    "glow": false,
+    "follows_theme": false
+  }
+}
