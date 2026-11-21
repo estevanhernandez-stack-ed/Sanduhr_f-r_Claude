@@ -76,8 +76,11 @@ class Fixture:
         os.makedirs(p, exist_ok=True)
         return p
 
-    def access(self, *accounts, schema=1):
-        self.write_json("mcp-access.json", {"schema_version": schema, "accounts": list(accounts)})
+    def access(self, *accounts, schema=1, agents=None):
+        doc = {"schema_version": schema, "accounts": list(accounts)}
+        if agents is not None:
+            doc["agents"] = agents
+        self.write_json("mcp-access.json", doc)
 
     def write_json(self, name, doc):
         with open(os.path.join(self.support, name), "w", encoding="utf-8") as f:
@@ -2047,6 +2050,132 @@ class ProposeInstall(Base):
         self.assertEqual((r["status"], r["folder"]), ("pending_review", ".claude"))
         with open(self.paths.mod_install_request, encoding="utf-8") as f:
             self.assertEqual(sorted(json.load(f)), ["folder", "id", "name", "requested_at", "schema_version"])
+
+
+class AgentTotals(Base):
+    """Item 13: Claude may read an agent's project totals, with consent. The totals come from the
+    agent's Vault rollups (`vault/codex`, `vault/antigravity`), never from raw logs, and only for
+    agents the access file's `agents` object switches on."""
+
+    def setUp(self):
+        super().setUp()
+        self.personal = self.fx.folder(".claude-personal")
+        # Today is 2026-07-26 (NOW); a 7-day window starts 2026-07-20.
+        self.fx.rollup("codex", "2026-07", {
+            "2026-07-25": {"total": 60, "by_project": {"api~3f2a91cc": 40, "web": 20}},
+            "2026-07-26": {"total": 15, "by_project": {"api~3f2a91cc": 15}},
+            "2026-07-10": {"total": 999, "by_project": {"old": 999}},
+        })
+        self.fx.rollup("antigravity", "2026-07", {"2026-07-25": {"total": 7, "by_project": {"lab": 7}}})
+
+    def share(self, agents=None, with_account=True):
+        accounts = [entry("Home", "activity", names="names", live_folder=self.personal)] if with_account else []
+        self.fx.access(*accounts, agents=agents)
+
+    def test_no_agents_object_means_nothing_consented(self):
+        self.share()
+        r = self.burn()
+        self.assertEqual(r["status"], "ok")
+        for key in ("agents", "agents_from", "agents_scanned"):
+            self.assertNotIn(key, r)
+        self.assertEqual(mcp.read_agents(self.paths), [])
+
+    def test_both_off_leaves_the_agent_keys_out(self):
+        self.share({"codex": False, "antigravity": False})
+        r = self.burn()
+        self.assertEqual(r["status"], "ok")
+        self.assertFalse({"agents", "agents_from", "agents_scanned"} & set(r))
+
+    def test_a_consented_agent_adds_its_project_totals_for_the_window(self):
+        self.share({"codex": True, "antigravity": False})
+        r = self.burn(7)
+        self.assertEqual(r["agents_from"], "2026-07-20")
+        self.assertEqual(r["agents_scanned"], ["codex"])
+        self.assertEqual(r["agents"], [{
+            "agent": "codex", "total_tokens": 75,
+            "projects": [{"name": "api", "tokens": 55}, {"name": "web", "tokens": 20}]}])
+        # The Claude Code roots answer as before, beside it.
+        self.assertEqual([x["root"] for x in r["roots"]], [ref("Home")])
+        self.assertNotIn("antigravity", json.dumps(r))
+
+    def test_the_day_window_follows_window_days(self):
+        self.share({"codex": True})
+        r = self.burn(1)
+        self.assertEqual(r["agents_from"], "2026-07-26")
+        self.assertEqual(r["agents"][0]["total_tokens"], 15)
+        self.assertEqual(self.burn(30)["agents"][0]["total_tokens"], 1074)   # 2026-06-27 on covers the 10th
+
+    def test_each_agent_needs_its_own_consent(self):
+        self.share({"codex": False, "antigravity": True})
+        r = self.burn()
+        self.assertEqual([a["agent"] for a in r["agents"]], ["antigravity"])
+        self.assertEqual(r["agents_scanned"], ["antigravity"])
+        self.share({"codex": True, "antigravity": True})
+        self.assertEqual([a["agent"] for a in self.burn()["agents"]], ["codex", "antigravity"])
+
+    def test_a_consented_agent_with_no_record_is_an_empty_entry(self):
+        self.fx.access(entry("Home", "activity", names="names", live_folder=self.personal),
+                       agents={"codex": False, "antigravity": True})
+        shutil.rmtree(os.path.join(self.fx.support, "vault", "antigravity"))
+        self.assertEqual(self.burn()["agents"], [{"agent": "antigravity", "total_tokens": 0, "projects": []}])
+
+    def test_a_file_without_agents_reads_both_off(self):
+        self.share()
+        self.assertEqual(mcp.read_agents(self.paths), [])
+
+    def test_a_damaged_agents_value_reads_off_entry_by_entry(self):
+        for bad in ("yes", 1, None, ["codex"], {"codex": "true", "antigravity": 1}, {"codex": 1, "antigravity": True}):
+            self.share(bad)
+            expected = ["antigravity"] if isinstance(bad, dict) and bad.get("antigravity") is True else []
+            self.assertEqual(mcp.read_agents(self.paths), expected, bad)
+        self.share({"codex": True, "other": True, "../x": True})
+        self.assertEqual(mcp.read_agents(self.paths), ["codex"])   # an unknown name is never a root
+
+    def test_consent_alone_answers_without_a_claude_code_folder(self):
+        self.share({"codex": True}, with_account=False)
+        r = self.burn()
+        self.assertEqual((r["status"], r["roots"], r["roots_scanned"]), ("ok", [], []))
+        self.assertEqual(r["agents"][0]["agent"], "codex")
+
+    def test_no_consent_and_no_folder_is_the_answer_it_always_was(self):
+        self.share(None, with_account=False)
+        self.assertEqual((self.burn()["status"], self.burn()["reason"]), ("no_data", "not_shared"))
+        self.share({"codex": False}, with_account=False)
+        self.assertEqual(self.burn()["reason"], "not_shared")
+
+    def test_an_unreadable_or_newer_file_still_shares_nothing(self):
+        self.fx.access(agents={"codex": True}, schema=2)
+        self.assertEqual(self.burn()["reason"], "not_shared")
+        self.assertEqual(mcp.read_agents(self.paths), [])
+
+    def test_a_non_hex_root_is_still_refused(self):
+        self.share({"codex": True})
+        # An account's vault_id must be 16 hex digits; an agent's root name is no vault id.
+        for bad in ("codex", "antigravity", "../codex", "0123456789abcdeg"):
+            self.fx.access(entry("Home", "activity", names="names", vault_id=bad), agents={"codex": True})
+            _, accounts = mcp.read_access(self.paths)
+            self.assertIsNone(accounts[0].vault_id, bad)
+        # And the vault reader skips any root name that is neither hex nor on the allowlist.
+        first, last = datetime(2026, 7, 1).date(), datetime(2026, 7, 26).date()
+        self.fx.rollup("notahex", "2026-07", {"2026-07-25": {"total": 5}})
+        os.makedirs(os.path.join(self.fx.support, "x"), exist_ok=True)
+        self.fx.rollup("../x", "2026-07", {"2026-07-25": {"total": 5}})
+        for bad in ("notahex", "../x", "Codex", "codex/", "claude", ""):
+            by_day, _, _, _ = mcp.read_vault_window(self.paths, [bad], first, last)
+            self.assertEqual(by_day, {}, bad)
+
+    def test_only_the_allowlisted_names_bypass_the_hex_rule(self):
+        self.assertEqual(mcp.AGENT_ROOTS, ("codex", "antigravity"))
+        first, last = datetime(2026, 7, 1).date(), datetime(2026, 7, 26).date()
+        by_day, _, _, _ = mcp.read_vault_window(self.paths, ["codex"], first, last)
+        self.assertEqual(sum(by_day.values()), 1074)
+        by_day, _, _, by_project = mcp.read_vault_window(self.paths, ["antigravity", VAULT_A], first, last)
+        self.assertEqual((sum(by_day.values()), by_project), (7, {"lab": 7}))
+
+    def test_the_tool_says_agents_need_consent(self):
+        tool = next(t for t in mcp.TOOLS if t["name"] == "get_local_burn_by_project")
+        self.assertIn("agents", tool["description"])
+        self.assertIn("consent", tool["description"])
 
 
 class ProjectNames(unittest.TestCase):

@@ -13,7 +13,7 @@ struct MCPAccessTests {
                                   choices: ["Work": AccountDataChoices(activity: .record, share: .off, folder: folder)])
         #expect(e.isEmpty)
         let json = String(decoding: MCPAccess.encode(e), as: UTF8.self)
-        #expect(json == #"{"accounts":[],"schema_version":1}"#)
+        #expect(json == #"{"accounts":[],"agents":{"antigravity":false,"codex":false},"schema_version":1}"#)
     }
 
     @Test func metersShareTheHistoryFileOnly() {
@@ -91,9 +91,66 @@ struct MCPAccessTests {
         #expect((attrs[.posixPermissions] as? NSNumber)?.intValue == 0o600)
         #expect(MCPAccess.sync(labels: ["Home"], active: "Home", choices: [:], to: url) == .written)
         let text = try String(contentsOf: url, encoding: .utf8)
-        #expect(text == #"{"accounts":[],"schema_version":1}"#)
+        #expect(text == #"{"accounts":[],"agents":{"antigravity":false,"codex":false},"schema_version":1}"#)
         // No temporary file is left beside it.
         let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         #expect(names == [MCPAccess.fileName])
+    }
+
+    // MARK: Claude may read agents' project totals (item 13)
+
+    @Test func theFileAlwaysCarriesAnAgentsObjectBothOffByDefault() throws {
+        let data = MCPAccess.encode([])
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let agents = try #require(root["agents"] as? [String: Bool])
+        #expect(agents == ["codex": false, "antigravity": false])
+        // With accounts present too: the same two keys, still both off.
+        let c = AccountDataChoices(share: .meters)
+        let withAccount = MCPAccess.encode(MCPAccess.entries(labels: ["Home"], active: "Home", choices: ["Home": c]))
+        let root2 = try #require(try JSONSerialization.jsonObject(with: withAccount) as? [String: Any])
+        #expect(root2["agents"] as? [String: Bool] == ["codex": false, "antigravity": false])
+    }
+
+    @Test func aConsentedAgentIsWrittenOnAndTheOtherStaysOff() throws {
+        let on = MCPAgentConsent.off.setting(.codex, true)
+        let data = MCPAccess.encode([], agents: on)
+        let root = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(root["agents"] as? [String: Bool] == ["codex": true, "antigravity": false])
+        #expect(String(decoding: data, as: UTF8.self)
+                == #"{"accounts":[],"agents":{"antigravity":false,"codex":true},"schema_version":1}"#)
+    }
+
+    @Test func claudeHasNoAgentKey() {
+        #expect(MCPAgentConsent.off.setting(.claude, true) == .off)
+        #expect(!MCPAgentConsent.off.isOn(.claude))
+    }
+
+    @Test func consentIsStoredUnderMcpAgentsKeysAndReadsOffWhenMissingOrDamaged() {
+        let store = MemoryDefaults()
+        #expect(MCPAgentConsent.load(from: store) == .off)
+        #expect(MCPAgentConsent.key(.codex) == "mcp.agents.codex")
+        #expect(MCPAgentConsent.key(.antigravity) == "mcp.agents.antigravity")
+        store.set("yes", forKey: "mcp.agents.codex")
+        store.set(1, forKey: "mcp.agents.antigravity")
+        #expect(MCPAgentConsent.load(from: store) == .off)
+        store.set(true, forKey: "mcp.agents.codex")
+        #expect(MCPAgentConsent.load(from: store) == MCPAgentConsent.off.setting(.codex, true))
+        MCPAgentConsent.off.setting(.antigravity, true).save(to: store)
+        #expect(MCPAgentConsent.load(from: store) == MCPAgentConsent.off.setting(.antigravity, true))
+    }
+
+    @Test func syncWritesTheConsentAndRewritesWhenItChanges() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sanduhr-mcp-agents-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent(MCPAccess.fileName)
+        #expect(MCPAccess.sync(labels: [], active: nil, choices: [:], to: url) == .written)
+        #expect(try String(contentsOf: url, encoding: .utf8).contains(#""agents":{"antigravity":false,"codex":false}"#))
+        let on = MCPAgentConsent.off.setting(.antigravity, true)
+        #expect(MCPAccess.sync(labels: [], active: nil, choices: [:], agents: on, to: url) == .written)
+        #expect(MCPAccess.sync(labels: [], active: nil, choices: [:], agents: on, to: url) == .unchanged)
+        #expect(try String(contentsOf: url, encoding: .utf8).contains(#""agents":{"antigravity":true,"codex":false}"#))
+        // Switching it back off rewrites the file with both off.
+        #expect(MCPAccess.sync(labels: [], active: nil, choices: [:], to: url) == .written)
     }
 }
