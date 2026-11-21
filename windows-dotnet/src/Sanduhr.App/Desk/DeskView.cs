@@ -265,7 +265,8 @@ internal sealed partial class DeskView : Grid, IDisposable
                 openHeight = Math.Ceiling(openHeight);
                 content = new ReserveFrame(top, openHeight, v);
             }
-            islands.Add(new DeskIsland(content, new Point(x, y), h, v) { Pause = pause, Widgets = widgets });
+            // The glow is one switch for the whole Desk, so every ink of this view carries the same strength.
+            islands.Add(new DeskIsland(content, new Point(x, y), h, v) { Pause = pause, Widgets = widgets, Pad = DeskGlow.Pad(_inks.Default.Glow) });
         }
         if (_roaming is { } walker)
         {
@@ -516,10 +517,13 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (piece is null) return null;
         piece.HorizontalAlignment = align;
         piece.Tag = p.Widget; // which piece this is, for the Desk's clicks (DeskClicks, spec 7.4)
-        // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other
-        // piece takes the ink's shadow.
-        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher" or "companion") && _ink.ShadowOpacity > 0)
-            piece.Effect = Shadow(_ink);
+        // The message carries its own glow (spec 6.2) and the glow's spot is clear at rest; every other piece takes the
+        // neon glow (5.0 spec 5) or, without it, the ink's shadow. The Desk draws one or the other.
+        if (p.Widget is not ("message" or "nowPlaying" or "glow" or "launcher" or "companion"))
+        {
+            if (_ink.Glow > 0) piece = DeskGlowLayer.On(piece, _ink);
+            else if (_ink.ShadowOpacity > 0) piece.Effect = Shadow(_ink);
+        }
         return piece;
     }
 
@@ -907,7 +911,10 @@ internal sealed partial class DeskView : Grid, IDisposable
         if (track.Duration is > 0) column.Children.Add(bar);
         // The shadow on the line and its bar only: the bars beside it redraw 20 times a second, and a
         // blur under them would be recomputed on every frame.
-        if (_ink.ShadowOpacity > 0) column.Effect = Shadow(_ink);
+        // The neon glow takes the same part: the line and its bar.
+        FrameworkElement lit = column;
+        if (_ink.Glow > 0) lit = DeskGlowLayer.On(column, _ink);
+        else if (_ink.ShadowOpacity > 0) column.Effect = Shadow(_ink);
 
         if (track.State == NowPlayingState.Playing && track.Duration is > 0)
         {
@@ -929,14 +936,14 @@ internal sealed partial class DeskView : Grid, IDisposable
             _live.Add(new Unhook(() => { tick.Stop(); gate.Changed -= OnGate; }));
         }
 
-        FrameworkElement content = column;
+        FrameworkElement content = lit;
         if (_frame.Bars && _frame.Audio is { } audio)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             var bars = BarsPiece(size, audio, look, _frame.BarsGradient || (look is null && _frame.NowPlayingStops is not null));
             bars.Margin = new Thickness(align == HorizontalAlignment.Right ? 0 : 0, 0, size * 0.6, 0);
-            if (align == HorizontalAlignment.Right) { row.Children.Add(column); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
-            else { row.Children.Add(bars); row.Children.Add(column); }
+            if (align == HorizontalAlignment.Right) { row.Children.Add(lit); bars.Margin = new Thickness(size * 0.6, 0, 0, 0); row.Children.Add(bars); }
+            else { row.Children.Add(bars); row.Children.Add(lit); }
             content = row;
         }
         // Whole piece in a host that fades it and gives its height back to the stack as it goes.
@@ -1097,11 +1104,12 @@ internal sealed partial class DeskView : Grid, IDisposable
     }
 
     /// <summary>The Launcher (spec, Desk Launcher): up to eight buttons in a row or a column, drawn by
-    /// <see cref="DeskLauncherPiece"/>; null with no buttons. The labels take the ink's shadow, the images none.</summary>
+    /// <see cref="DeskLauncherPiece"/>; null with no buttons. The labels take the ink's shadow, or the neon glow in one color; the images neither.</summary>
     private FrameworkElement? LauncherPiece(double ts) =>
         _frame.Launcher is { } launcher
             ? DeskLauncherPiece.Create(launcher, ts, _family, Ink, _ink.Stops.Count > 0 ? Rgb(_ink.Stops[0]) : Colors.White,
-                _ink.TextOpacity, _ink.ShadowOpacity > 0 ? Shadow(_ink) : null)
+                _ink.TextOpacity,
+                _ink.Glow > 0 ? DeskGlowLayer.OneColor(DeskGlowLayer.Middle(_ink.Stops), _ink.Glow) : _ink.ShadowOpacity > 0 ? Shadow(_ink) : null)
             : null;
 
     /// <summary>Watchers (spec 6.9): a card per watcher, most urgent first: the title, its progress,

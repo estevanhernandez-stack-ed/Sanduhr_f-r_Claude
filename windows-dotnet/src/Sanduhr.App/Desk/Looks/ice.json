@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "ice",
+  "name": "Ice",
+  "blurb": "Handwriting in a cold gradient.",
+  "font_fallback": "Segoe UI",
+  "design": {
+    "layout": {
+      "message": { "anchor": "bl", "size": 1 },
+      "clock": { "anchor": "bl", "size": 1.3 },
+      "weather": { "anchor": "tr", "size": 1 },
+      "claude": { "hidden": true },
+      "meters": { "hidden": true },
+      "nowPlaying": { "hidden": true },
+      "telemetry": { "hidden": true },
+      "watchers": { "hidden": true },
+      "launcher": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "EsteFont Pro",
+    "ink": ["#8f5bd6", "#3a63e0", "#33fdff"],
+    "plate": false,
+    "shadow": true,
+    "glow": false,
+    "follows_theme": false
+  }
+}

@@ -278,4 +278,14 @@ public class SetupPromptTests
         Assert.True(r.Ok);
         Assert.Empty(DeskDesign.Parse(r.Desk).Reasons);
     }
+
+    [Fact]
+    public void The_prompt_teaches_the_glow_and_a_pasted_design_may_carry_it()
+    {
+        Assert.Contains("glow", SetupPrompt.DeskFields);
+        Assert.Contains("glow: true or false, or a strength from 0.2 to 1", Prompt);
+        var verdict = PastedSetup.RefuseUndrawn(DeskDesign.Validate(
+            (System.Text.Json.Nodes.JsonObject)System.Text.Json.Nodes.JsonNode.Parse("""{"glow":0.7,"shadow":false}""")!, DeskDesignContext.Unknown));
+        Assert.True(verdict.Ok);
+    }
 }

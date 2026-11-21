@@ -51,6 +51,12 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- The ready-made Desk looks (5.0 spec 5): six JSON files inside the app. Nothing is downloaded and nothing is written. -->
+  <ItemGroup>
+    <None Remove="Desk\Looks\*.json" />
+    <EmbeddedResource Include="Desk\Looks\*.json" LogicalName="DeskLooks/%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- The meters mod is shared with the Mac: mac\integrations\mods\sanduhr-meters is copied into
        the output (and the publish output) as mods\sanduhr-meters\. Install copies it from there
        into %USERPROFILE%\.sanduhr\mods\<stamp>\. Tests, the repo's .gitignore and Claude Code's

@@ -1,0 +1,135 @@
+<UserControl x:Class="Sanduhr.App.Views.DeskLooksPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="clr-namespace:Sanduhr.Core;assembly=Sanduhr.Core"
+             xmlns:views="clr-namespace:Sanduhr.App.Views"
+             Focusable="False">
+    <!-- Settings, Desk, Looks (5.0 spec 5): six ready-made looks, each a button that applies it in one click; the same Put my Desk back
+         as Designs and the tray; a live line for what the last press did. Its own control so the names Narrator reads can be tested.
+         The Settings window supplies the FlatButton and SettingsLinkButton styles (found at run time) and the theme brushes. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis" />
+        <!-- A look's card: a quiet bordered button. Hover lifts it; the keyboard ring is the text ink, as on FlatButton (WF38). -->
+        <Style x:Key="LookCardButton" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{DynamicResource Sanduhr.Brush.Text}" />
+            <Setter Property="Background" Value="{DynamicResource Sanduhr.Brush.Glass}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Border}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{DynamicResource Sanduhr.Brush.GlassHover}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource Sanduhr.Brush.Text}" />
+                                <Setter TargetName="bg" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="bg" Property="Padding" Value="6" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <StackPanel>
+        <DockPanel LastChildFill="False">
+            <TextBlock DockPanel.Dock="Left" Text="{x:Static core:SettingsNames.LooksSection}" FontSize="13" FontWeight="SemiBold"
+                       VerticalAlignment="Center" AutomationProperties.HeadingLevel="Level2"
+                       Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+            <Button DockPanel.Dock="Right" x:Name="LooksPutBack" Style="{DynamicResource FlatButton}" Padding="12,6" Margin="0"
+                    Content="{x:Static core:SettingsNames.PutMyDeskBack}"
+                    Command="{Binding PutBackCommand}"
+                    AutomationProperties.Name="{x:Static core:SettingsNames.PutMyDeskBack}"
+                    AutomationProperties.HelpText="Switches to the design saved before the last change" />
+        </DockPanel>
+        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                   Text="{x:Static core:SettingsNames.LooksCaption}" />
+        <views:DeskLooksRow x:Name="LooksRow" ItemsSource="{Binding Cards}" Margin="0,12,0,0" Focusable="False"
+                            KeyboardNavigation.DirectionalNavigation="Contained" KeyboardNavigation.TabNavigation="Once">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Width="224" Margin="0,0,12,12">
+                        <Button Style="{StaticResource LookCardButton}" Command="{Binding ApplyCommand}"
+                                AutomationProperties.Name="{Binding AccessibleName}">
+                            <StackPanel>
+                                <Border CornerRadius="5" ClipToBounds="True" HorizontalAlignment="Left">
+                                    <views:DeskLookCard Design="{Binding Fitted}" Wallpaper="{Binding Wallpaper}"
+                                                        BackdropHex="{Binding BackdropHex}" Brightness="{Binding Brightness}"
+                                                        LookName="{Binding Name}" />
+                                </Border>
+                                <DockPanel Margin="0,7,0,0" LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Name}" FontSize="12" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Sanduhr.Brush.Text}" />
+                                    <TextBlock DockPanel.Dock="Right" FontSize="11"
+                                               Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                                               Visibility="{Binding Current, Converter={StaticResource BoolVis}}">
+                                        <Run Text="&#x2713; " /><Run Text="{x:Static core:SettingsNames.OnYourDesk}" />
+                                    </TextBlock>
+                                </DockPanel>
+                                <TextBlock Text="{Binding Blurb}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                           Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                                <ItemsControl ItemsSource="{Binding Notes}" Focusable="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Button>
+                        <!-- What a shown piece needs: links, outside the card button (a button inside a button takes no keyboard). -->
+                        <ItemsControl ItemsSource="{Binding Needs}" Focusable="False" Margin="8,2,0,0">
+                            <!-- The item's own automation name is its text, not the record's dump. -->
+                            <ItemsControl.ItemContainerStyle>
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding Text}" />
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
+                            <!-- One note: every need as a link, flowing on one wrapping line inside the card's width. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{DynamicResource SettingsLinkButton}" HorizontalAlignment="Left" Margin="0,0,8,0"
+                                            Content="{Binding Text}" views:SettingsLinkTo.Link="{Binding Link}"
+                                            AutomationProperties.Name="{Binding Text}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </views:DeskLooksRow>
+        <TextBlock x:Name="LooksStatus" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                   views:LiveRegion.Announces="True"
+                   Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}"
+                   Text="{Binding Status}"
+                   Visibility="{Binding HasStatus, Converter={StaticResource BoolVis}}" />
+    </StackPanel>
+</UserControl>

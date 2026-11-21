@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "terminal",
+  "name": "Terminal",
+  "blurb": "Monospace, green, all numbers.",
+  "font_fallback": "Courier New",
+  "design": {
+    "layout": {
+      "clock": { "anchor": "tl", "size": 0.9 },
+      "claude": { "anchor": "tl", "size": 1, "style": "ticks" },
+      "meters": { "anchor": "ml", "size": 1, "style": "ticks" },
+      "telemetry": { "anchor": "bl", "size": 1, "style": "ticks" },
+      "message": { "hidden": true },
+      "nowPlaying": { "hidden": true },
+      "weather": { "hidden": true },
+      "watchers": { "hidden": true },
+      "launcher": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "Consolas",
+    "ink": "#7cfc9a",
+    "plate": false,
+    "shadow": true,
+    "glow": false,
+    "follows_theme": false
+  }
+}

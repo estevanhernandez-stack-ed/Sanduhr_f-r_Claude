@@ -114,6 +114,42 @@ internal sealed class WallpaperInk
         }
     }
 
+    /// <summary>
+    /// The primary monitor's wallpaper as that monitor shows it (fit mode and background color), about
+    /// <see cref="SummaryWidth"/> pixels wide, for the ready-made look cards (5.0 spec 5): the same decoded image the summary
+    /// reads, drawn once and frozen. Null when the desktop is a plain color, when the picture cannot be read (a slideshow between
+    /// pictures, a file that is gone), or on any failure; the caller then falls back to a color. It stays in memory: nothing is
+    /// written, and nothing leaves this process.
+    /// </summary>
+    public BitmapSource? Picture()
+    {
+        try
+        {
+            if (!_read)
+            {
+                _info = DeskSensorsNative.Wallpaper();
+                _read = true;
+            }
+            if (_info is not { } info || info.Monitors.Count == 0) return null;
+            var m = info.Monitors.FirstOrDefault(x => x.Left == 0 && x.Top == 0) ?? info.Monitors[0];
+            if (m.Path is null) return null;
+            var monitor = new PxRect(m.Left, m.Top, m.Right - m.Left, m.Bottom - m.Top);
+            if (monitor.IsEmpty || Decode(m.Path) is not { } image) return null;
+            var bg = ((byte)(info.Background & 0xFF), (byte)((info.Background >> 8) & 0xFF), (byte)((info.Background >> 16) & 0xFF));
+            var drawn = WallpaperRender.Monitor(image.Pixels, image.Width, image.Height, image.Stride,
+                image.NaturalWidth, image.NaturalHeight, monitor, (WallpaperPosition)info.Position, VirtualScreen(info.Monitors), bg, SummaryWidth);
+            if (drawn is not { } d) return null;
+            var picture = BitmapSource.Create(d.Width, d.Height, 96, 96, PixelFormats.Bgr32, null, d.Bgra, d.Width * 4);
+            picture.Freeze();
+            return picture;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException
+                                      or InvalidOperationException or ArgumentException or System.Runtime.InteropServices.COMException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The wallpaper's average relative luminance behind <paramref name="region"/> (physical
     /// pixels) on <paramref name="screen"/>, or null when it can't be known.</summary>
     public double? Luminance(DeskScreen screen, PxRect region)

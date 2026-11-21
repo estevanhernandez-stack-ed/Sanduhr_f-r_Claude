@@ -10,14 +10,19 @@ public static class WhatsNewCards
     public static IReadOnlyList<WhatsNewCard> Table { get; } = Anchored([.. Release500(), .. Release490(), .. Release480(), .. Release470(), .. Release460(), .. Release450(), .. Release400(), .. Release390(), .. Release380(), .. Release371(), .. Release360(), .. Release350()]);
 
     // 5.0.0 (spec 4, agent notifications). Names Codex (the window carries that trademark line) and not Antigravity
-    // (it carries no Google line; No_card_names_Antigravity). Show me lands on Settings ▸ Notifications. More 5.0 cards
-    // join this list as the release's other parts land.
+    // (it carries no Google line; No_card_names_Antigravity). Show me lands on Settings ▸ Notifications. The looks card
+    // (spec 5) has joined; more 5.0 cards join this list as the release's other parts land.
     private static WhatsNewCard[] Release500() =>
     [
         WhatsNewCard.Of("5.0.0", "agent-notifications", "Know when your agent is done",
             "A notification, a Desk card or a glow when Claude Code, Codex or another agent finishes a long turn. Choose what shows in Settings, Notifications.",
             "\uEA8F", // Ringer
             WhatsNewPreview.None, SettingsPage.Notifications),
+        // Spec 5, ready-made looks. Show me lands on Settings ▸ Desk ▸ Looks. Names no agent, so it needs no trademark line.
+        WhatsNewCard.Of("5.0.0", "ready-made-looks", "Six looks for your Desk",
+            "Pick a ready-made look in Settings, Desk and your whole Desk changes in one click, and Put my Desk back undoes it. There's a neon glow for the ink, too.",
+            "", // Color
+            WhatsNewPreview.None, SettingsPage.Desk),
     ];
 
     // 4.9.0 (spec 3, every agent's activity): Codex's local burn beside Claude Code's. Names Codex only: a card naming
@@ -240,6 +245,7 @@ public static class WhatsNewCards
     private static string? AnchorFor(string id) => id switch
     {
         "agent-notifications" => SettingsIndex.NotifyAgents,
+        "ready-made-looks" => SettingsIndex.DeskLooks,
         "codex-limits" or "agent-activity" => SettingsIndex.SourcesList,
         "widget-from-file" => SettingsIndex.ModList,
         "desk-under-icons" => SettingsIndex.DeskUnderIcons,

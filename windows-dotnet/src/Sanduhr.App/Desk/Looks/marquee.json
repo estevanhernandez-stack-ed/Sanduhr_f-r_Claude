@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "marquee",
+  "name": "Marquee",
+  "blurb": "Clock up top, neon glow.",
+  "font_fallback": "Segoe UI",
+  "design": {
+    "layout": {
+      "clock": { "anchor": "tc", "size": 1.4 },
+      "message": { "anchor": "tc", "size": 1 },
+      "nowPlaying": { "anchor": "bc", "size": 1 },
+      "claude": { "hidden": true },
+      "meters": { "hidden": true },
+      "telemetry": { "hidden": true },
+      "weather": { "hidden": true },
+      "watchers": { "hidden": true },
+      "launcher": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "Bahnschrift",
+    "ink": "#ffd08a",
+    "plate": false,
+    "shadow": false,
+    "glow": 0.7,
+    "follows_theme": false
+  }
+}

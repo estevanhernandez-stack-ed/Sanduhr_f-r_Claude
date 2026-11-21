@@ -28,6 +28,7 @@ public sealed class SetupServiceTests : IDisposable
         public string? SortNow() { Calls.Add("sort"); return SortAnswer; }
         public void SetUsage(bool on) { Calls.Add("usage:" + on); UsageOn = on; }
         public void ReloadDesk() => Calls.Add("reload");
+        public string? ApplyLook(string id) => null;
     }
 
     [Fact]

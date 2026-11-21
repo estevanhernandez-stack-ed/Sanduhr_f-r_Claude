@@ -2433,7 +2433,7 @@
                     </ScrollViewer>
                 </TabItem>
 
-                <!-- Desk (Settings v2, slice 3: the split, WF22, WF8): the switch, Arrange, the map on top, every piece (Show, place, order),
+                <!-- Desk (Settings v2, slice 3: the split, WF22, WF8): the switch, the ready-made looks, Arrange, the map, every piece (Show, place, order),
                      Behavior, and the collapsed Designs and Advanced. Fonts, sizes and colors are on Desk Look; Watchers and the Launcher
                      have pages of their own. Every change saves at once and the running Desk follows. -->
                 <TabItem Header="Desk" Tag="Desk" AutomationProperties.Name="Desk"
@@ -2464,6 +2464,13 @@
                                         <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
                                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                                    Text="Off by default. Draws on the desktop behind your windows, on every monitor, and keeps clear of the taskbar. Turn it off here at any time." />
+                                    </StackPanel>
+
+                                    <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />
+
+                                    <!-- Looks (5.0 spec 5): six ready-made looks, one click each. Greyed while Arrange Desk runs, as Pieces is. -->
+                                    <StackPanel views:SettingsAnchor.Id="looks" IsEnabled="{Binding NotArranging}">
+                                        <views:DeskLooksPanel DataContext="{Binding Looks}" />
                                     </StackPanel>
 
                                     <Border Height="1" Background="{DynamicResource Sanduhr.Brush.Border}" Margin="0,16,0,16" />

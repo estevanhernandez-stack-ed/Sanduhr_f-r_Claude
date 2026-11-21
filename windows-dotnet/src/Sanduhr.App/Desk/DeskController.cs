@@ -178,7 +178,25 @@ internal sealed class DeskController : IDisposable, IDeskClickActions
     }
 
     /// <summary>The ink with OLED care's rule on it: nothing held at pure white. Off, the ink as resolved.</summary>
-    private ResolvedInk Care(ResolvedInk ink) => _oledOn ? DeskInk.CapWhite(ink) : ink;
+    /// <summary>Every ink the Desk draws passes through here: the neon glow switch (so it reaches a followed widget theme's ink too),
+    /// the one-color hint for the Desk under the icons, and OLED care's white cap.</summary>
+    private ResolvedInk Care(ResolvedInk ink)
+    {
+        ink = Lit(ink, _ink, GlowOneColorNow);
+        return _oledOn ? DeskInk.CapWhite(ink) : ink;
+    }
+
+    /// <summary>The glow switch of the Desk's own ink setting put on <paramref name="ink"/>, and, when it glows and
+    /// <paramref name="oneColor"/> says so, the hint to draw that glow in one color.</summary>
+    internal static ResolvedInk Lit(ResolvedInk ink, DeskInkSettings own, bool oneColor)
+    {
+        var lit = DeskInk.Glowing(ink, own);
+        return lit.Glow > 0 && oneColor ? lit with { GlowOneColor = true } : lit;
+    }
+
+    /// <summary>The Desk draws under the desktop icons and the measurement said the blurred copy costs too much there.</summary>
+    private bool GlowOneColorNow =>
+        DeskGlowLayer.UnderIconsOneColor && _hostUnderIcons && UnderIcons.UnderIconsHost.Unavailable is null;
 
     /// <summary>True when the Watchers piece has a place on the Desk (the watcher glow fires only then).</summary>
     internal bool WatchersPlaced => Placed("watchers");

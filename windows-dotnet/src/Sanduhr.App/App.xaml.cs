@@ -742,6 +742,8 @@ public partial class App : Application
         // and the request/result handoff for propose_desk (phase 1 answers not_ready; the preview is the next phase).
         _deskDesign = new Desk.DeskDesignService(paths, store, _launcherApps);
         Desk.DeskDesignService.Current = _deskDesign;
+        // A look card says "Watchers needs a watcher." while the board is empty (5.0 spec 5).
+        _deskDesign.HasWatcher = () => _watchers?.Shown.Count > 0;
         _deskDesign.Start();
         // A look per song (spec, a look per song): the gradient and letter style the Desk draws the playing song in, Claude's suggested looks
         // (the MCP tool and the now-playing mod's offer), and now-playing-look.json for the mod. The contrast rule is judged against the wallpaper.
@@ -761,7 +763,13 @@ public partial class App : Application
         _drawers.TidyRequested = id => TidyDrawers(null, _desk?.MonitorOf(id));
         // The live review of Claude's Desk designs: the Desk and widget draw a design from memory, the floating bar asks Apply or Dismiss.
         _deskDesign.Host = new Desk.DeskDesignHost(_desk, () => _vm, FollowDesignChange);
-        _deskDesign.DesignsChanged += () => _settingsWindow?.ViewModel.Desk.Designs.Reload();
+        _deskDesign.DesignsChanged += () =>
+        {
+            _settingsWindow?.ViewModel.Desk.Designs.Reload();
+            _settingsWindow?.ViewModel.Desk.Looks.Reload();
+        };
+        // The wallpaper, the monitors or the fonts changed: the look cards are fitted and drawn again, on the UI thread.
+        _deskDesign.LooksChanged += () => Dispatcher.BeginInvoke(new Action(() => _settingsWindow?.ViewModel.Desk.Looks.Reload()));
         // Widgets made with Claude (spec 3.8 section 5): propose_widget's pack previews on the Desk and installs only on Apply.
         _widgetReview = new Desk.WidgetReviewService(paths, store);
         Desk.WidgetReviewService.Current = _widgetReview;
@@ -1235,7 +1243,8 @@ public partial class App : Application
             question => ThemedDialog.ShowConfirm(_setupWindow, SettingsNames.DrawersTurnOffTitle, question,
                 SettingsNames.DrawersPutThemBack, SettingsNames.DrawersCancel));
         var model = new SetupViewModel(new SetupService(store, host), firstRun,
-            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0)   // streamer: key - a count, never drawn
+            hasAccount: () => vm.AccountStore.ListAccounts().Count > 0,   // streamer: key - a count, never drawn
+            looks: () => _deskDesign)
         { DesignWithChatRequested = OpenChatDesign };
         SetupResult? applied = null;
         model.Applied += result => applied = result;
