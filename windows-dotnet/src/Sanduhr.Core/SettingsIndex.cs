@@ -323,6 +323,7 @@ public static class SettingsIndex
             [SettingsNames.ClockSize, SettingsNames.MessageSize, "time size", "size", "bigger", "smaller"]),
         E(SettingsNames.InkAndColor, SettingsPage.DeskLook, DeskInk,
             ["ink", SettingsNames.DeskInkPicker, "text color", "automatic", "light", "dark", "wallpaper", "readable", SettingsNames.DropShadow,
+             SettingsNames.NeonGlow, SettingsNames.GlowStrength, "neon", "glow",
              "shadow", "gradient", "hex", "palette", "presets", SettingsNames.MessageColor, SettingsNames.GlowAroundMessage, SettingsNames.UseThemeColors, "theme colors", "same look", "colored lines"]),
         E(SettingsNames.BackPlate, SettingsPage.DeskLook, DeskPlate,
             [SettingsNames.DeskPlateSwitch, "plate", "backdrop", "background", "contrast", "readable", "desktop icons", "files", "dark plate", "behind the text"]),

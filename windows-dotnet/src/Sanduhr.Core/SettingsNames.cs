@@ -1167,6 +1167,11 @@ public static class SettingsNames
     public const string UseThemeColorsCaption =
         "The message draws in your widget theme's message colors and glow, the same as the rest of the Desk. Your own colors and any colored lines are kept for when you turn this off.";
     public const string DropShadow = "Drop shadow under the text";
+    public const string NeonGlow = "Neon glow";
+    public const string GlowStrength = "Glow strength";
+    public const string NeonGlowCaption = "A soft light behind the Desk's text and meters, in the ink's own colors. It takes the place of the drop shadow, and it stays on while the Desk follows the widget theme.";
+    public const string CoveredByNeonGlow = "Covered by Neon glow.";
+    public const string GlowUnderIconsOneColor = "Under the desktop icons the glow is one color.";
 
     // ---- One theme for the widget and the Desk (theme match) ----
     /// <summary>Desk Look's first section (theme match).</summary>

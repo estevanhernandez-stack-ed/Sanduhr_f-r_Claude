@@ -180,6 +180,37 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
                                    Text="{x:Static core:SettingsNames.DeskInkCaption}" />
                     </StackPanel>
+                    <!-- Neon glow (5.0 spec 5): one switch for the whole Desk, so it is not greyed out while the Desk follows the widget theme. -->
+                    <StackPanel Margin="0,10,0,0" DataContext="{Binding Desk}">
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}"
+                                  Content="{x:Static core:SettingsNames.NeonGlow}" IsChecked="{Binding InkGlow, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.NeonGlow}"
+                                  AutomationProperties.HelpText="{x:Static core:SettingsNames.NeonGlowCaption}" />
+                        <Grid Margin="0,10,0,0" Visibility="{Binding InkGlow, Converter={StaticResource BoolVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="230" />
+                                <ColumnDefinition Width="44" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{x:Static core:SettingsNames.GlowStrength}" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextSecondary}" />
+                            <Slider Grid.Column="1" x:Name="GlowStrengthSlider" Style="{DynamicResource ThemedSlider}"
+                                    Minimum="20" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" SmallChange="5" LargeChange="20"
+                                    Value="{Binding InkGlowPercent, Mode=TwoWay}"
+                                    AutomationProperties.Name="{x:Static core:SettingsNames.GlowStrength}"
+                                    AutomationProperties.ItemStatus="{Binding InkGlowPercentText}" />
+                            <TextBlock Grid.Column="2" Text="{Binding InkGlowPercentText}"
+                                       FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                       Foreground="{DynamicResource Sanduhr.Brush.TextDim}" FontFamily="Cascadia Code, Consolas" />
+                        </Grid>
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                   Text="{x:Static core:SettingsNames.NeonGlowCaption}" />
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                   Text="{Binding GlowUnderIconsNote}"
+                                   Visibility="{Binding GlowUnderIconsNote, Converter={StaticResource StrVis}}" />
+                    </StackPanel>
                     <StackPanel Margin="0,14,0,0" DataContext="{Binding MessagePage}">
                         <CheckBox Style="{DynamicResource ThemedCheckBox}"
                                   Content="{x:Static core:SettingsNames.UseThemeColors}" IsChecked="{Binding ThemeColors, Mode=TwoWay}"
@@ -213,9 +244,14 @@
                                    Foreground="{DynamicResource Sanduhr.Brush.PaceMarker}"
                                    Text="{Binding CustomColorProblem}"
                                    Visibility="{Binding CustomColorProblem, Converter={StaticResource StrVis}}" />
-                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0" IsEnabled="{Binding OwnColorsEnabled}"
-                                  Content="{x:Static core:SettingsNames.GlowAroundMessage}" IsChecked="{Binding Glow, Mode=TwoWay}"
-                                  AutomationProperties.Name="{x:Static core:SettingsNames.GlowAroundMessage}" />
+                        <CheckBox Style="{DynamicResource ThemedCheckBox}" Margin="0,10,0,0" IsEnabled="{Binding GlowEnabled}"
+                                  Content="{x:Static core:SettingsNames.GlowAroundMessage}" IsChecked="{Binding GlowShown, Mode=TwoWay}"
+                                  AutomationProperties.Name="{x:Static core:SettingsNames.GlowAroundMessage}"
+                                  AutomationProperties.HelpText="{Binding GlowCoveredNote}" />
+                        <TextBlock FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Foreground="{DynamicResource Sanduhr.Brush.TextDim}"
+                                   Text="{Binding GlowCoveredNote}"
+                                   Visibility="{Binding GlowCoveredNote, Converter={StaticResource StrVis}}" />
                     </StackPanel>
                 </StackPanel>
 

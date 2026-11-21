@@ -457,6 +457,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
     {
         Flush();   // a size drag still inside its settle window would be overwritten by the old value
         _settings = _store.LoadDeskMessage();
+        _neonGlow = _store.LoadDeskInk().Glow;
         _customColorText = null;
         RaiseSettings();
     }
@@ -817,6 +818,33 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
         set => Apply(_settings with { Glow = value });
     }
 
+    private bool _neonGlow;
+
+    /// <summary>Neon glow (Desk Look) is on: it covers the message, so the message's own switch shows on and cannot be changed.
+    /// The message's own setting is not touched, and shows again when Neon glow goes off.</summary>
+    public void SetNeonGlow(bool on)
+    {
+        if (_neonGlow == on) return;
+        _neonGlow = on;
+        OnPropertyChanged(nameof(GlowShown));
+        OnPropertyChanged(nameof(GlowEnabled));
+        OnPropertyChanged(nameof(GlowCoveredNote));
+    }
+
+    /// <summary>What the "Glow around the message" box shows: on while Neon glow covers it, else the message's own setting.</summary>
+    public bool GlowShown
+    {
+        get => _neonGlow || Glow;
+        set
+        {
+            if (!_neonGlow) Glow = value;
+        }
+    }
+
+    public bool GlowEnabled => OwnColorsEnabled && !_neonGlow;
+
+    public string? GlowCoveredNote => _neonGlow ? SettingsNames.CoveredByNeonGlow : null;
+
     public ObservableCollection<MessageChoice<string>> FontOptions { get; }
 
     private IReadOnlyList<MessageChoice<string>> BuildFontOptions()
@@ -869,6 +897,7 @@ public sealed partial class DeskMessagePageViewModel : ObservableObject, IDispos
             nameof(IsDaily), nameof(IsHourly), nameof(Mix), nameof(Pin), nameof(IsStack), nameof(IsTurns), nameof(IsScroll),
             nameof(SecondsApply), nameof(Seconds), nameof(Size), nameof(Glow), nameof(Font),
             nameof(ThemeColors), nameof(OwnColorsEnabled),
+            nameof(GlowShown), nameof(GlowEnabled), nameof(GlowCoveredNote),
         })
             OnPropertyChanged(name);
         RaiseColor();

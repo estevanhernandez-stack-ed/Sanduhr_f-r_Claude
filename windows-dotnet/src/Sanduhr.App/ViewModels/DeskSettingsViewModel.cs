@@ -385,6 +385,23 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private string _inkColors = "ffffff";
     [ObservableProperty] private string? _inkPreset;
     [ObservableProperty] private bool _inkShadow = true;
+    [ObservableProperty] private bool _inkGlow;
+
+    /// <summary>The glow's strength as a percentage, 20 to 100: what the slider moves and what a screen reader says.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InkGlowPercentText))]
+    private double _inkGlowPercent = DeskGlow.DefaultStrength * 100;
+
+    public string InkGlowPercentText => Math.Round(InkGlowPercent).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>Neon glow was switched (by its own box, or off by the shadow's): the message's switch follows.</summary>
+    public event Action? InkGlowChanged;
+
+    /// <summary>The line beside the switch when the Desk under the desktop icons draws the glow in one color; null otherwise.</summary>
+    public string? GlowUnderIconsNote =>
+        InkGlow && UnderIcons && Sanduhr.App.Desk.DeskGlowLayer.UnderIconsOneColor
+        && Sanduhr.App.Desk.UnderIcons.UnderIconsHost.Unavailable is null
+            ? SettingsNames.GlowUnderIconsOneColor : null;
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
@@ -490,6 +507,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveDeskUnderIcons(value);
             OnPropertyChanged();
             OnPropertyChanged(nameof(UnderIconsNote));
+            OnPropertyChanged(nameof(GlowUnderIconsNote));
             Changed?.Invoke();
         }
     }
@@ -505,7 +523,11 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         InkColors = _ink.Color;
         InkPreset = PresetShown();
         InkShadow = _ink.Shadow;
+        InkGlow = _ink.Glow;
+        InkGlowPercent = Math.Round(_ink.GlowStrength * 100);
+        _glowTold = _ink.Glow;
         _loadingInk = false;
+        OnPropertyChanged(nameof(GlowUnderIconsNote));
     }
 
     /// <summary>The Colors row names a preset only while the ink is Custom: Light, Dark and Theme ignore the saved colours.</summary>
@@ -565,7 +587,41 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         SaveInk(_ink with { Color = spec, Mode = DeskInkMode.Custom });
     }
 
-    partial void OnInkShadowChanged(bool value) => SaveInk(_ink with { Shadow = value });
+    partial void OnInkShadowChanged(bool value)
+    {
+        if (_loadingInk) return;
+        SaveInk(_ink.WithShadow(value));
+        SyncInkSwitches();
+    }
+
+    partial void OnInkGlowChanged(bool value)
+    {
+        if (_loadingInk) return;
+        SaveInk(_ink.WithGlow(value));
+        SyncInkSwitches();
+    }
+
+    partial void OnInkGlowPercentChanged(double value)
+    {
+        if (_loadingInk) return;
+        SaveInk(_ink.WithGlowStrength(value / 100));
+    }
+
+    /// <summary>Glow and shadow are either-or: after one is switched, both boxes show what was saved.</summary>
+    private void SyncInkSwitches()
+    {
+        _loadingInk = true;
+        InkShadow = _ink.Shadow;
+        InkGlow = _ink.Glow;
+        _loadingInk = false;
+        OnPropertyChanged(nameof(GlowUnderIconsNote));
+        if (_glowTold == _ink.Glow) return;
+        _glowTold = _ink.Glow;
+        InkGlowChanged?.Invoke();
+    }
+
+    /// <summary>The glow's value the listeners last heard, so a switch is told once.</summary>
+    private bool _glowTold;
 
     private void SaveInk(DeskInkSettings next)
     {
