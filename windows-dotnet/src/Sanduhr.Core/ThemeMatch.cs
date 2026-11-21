@@ -107,7 +107,7 @@ public static partial class ThemeMatch
             Font = look.Font is { } f && (fontAvailable?.Invoke(f) ?? true) ? DeskDesignApply.FontSetting(new DeskFontChoice(f)) : desk.Font,
             Plate = look.Plate,
         },
-        ink with { Mode = DeskInkMode.Custom, Color = string.Join(",", look.Ink), Shadow = true },
+        (ink with { Mode = DeskInkMode.Custom, Color = string.Join(",", look.Ink) }).WithShadow(true),
         message with { Color = string.Join(",", look.Message), Glow = true },
         np with { BarsGradient = true });
 }

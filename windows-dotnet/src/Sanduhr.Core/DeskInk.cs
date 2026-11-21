@@ -7,14 +7,61 @@ namespace Sanduhr.Core;
 public enum DeskInkMode { Auto, Light, Dark, Theme, Custom }
 
 /// <summary>
-/// The Desk ink setting (settings.json <c>desk_ink</c> <c>{mode, color, shadow}</c>). <paramref name="Color"/>
-/// is the Mac's hex spec (one to four colors, comma separated) and only matters in Custom mode;
-/// <paramref name="Shadow"/> is "Drop shadow under the text". A missing or odd member reads as its default and
-/// an unknown mode as Automatic, so an existing install is unchanged.
+/// The neon glow's numbers (5.0 spec 5, section 7). A strength from 0.2 to 1.0 gives the blur radius of the copy drawn behind
+/// the ink (6 to 22 DIPs) and that copy's opacity (0.45 to 0.9). Kept in this file because the MCP server links it.
 /// </summary>
-public sealed record DeskInkSettings(DeskInkMode Mode, string Color, bool Shadow)
+public static class DeskGlow
+{
+    public const double MinStrength = 0.2;
+    public const double MaxStrength = 1.0;
+    public const double DefaultStrength = 0.6;
+    public const double MinRadius = 6;
+    public const double MaxRadius = 22;
+    public const double MinOpacity = 0.45;
+    public const double MaxOpacity = 0.9;
+
+    /// <summary>The room around an island for the ink's shadow, in DIPs: what the Desk has always left.</summary>
+    public const double BasePad = 16;
+
+    /// <summary>The room the glow needs beyond its blur radius, in DIPs.</summary>
+    public const double PadBeyondRadius = 4;
+
+    /// <summary>A strength held to the range and rounded to two places; not a number reads as the default.</summary>
+    public static double Clamp(double strength) =>
+        double.IsFinite(strength) ? Math.Round(Math.Clamp(strength, MinStrength, MaxStrength), 2) : DefaultStrength;
+
+    private static double Along(double strength) => (Clamp(strength) - MinStrength) / (MaxStrength - MinStrength);
+
+    /// <summary>The blur radius of the glowing copy, in DIPs.</summary>
+    public static double Radius(double strength) => MinRadius + Along(strength) * (MaxRadius - MinRadius);
+
+    /// <summary>The opacity of the glowing copy.</summary>
+    public static double Opacity(double strength) => MinOpacity + Along(strength) * (MaxOpacity - MinOpacity);
+
+    /// <summary>The room around an island: <see cref="BasePad"/> with the glow off (a strength of 0 or less), otherwise the larger of
+    /// that and the blur radius plus <see cref="PadBeyondRadius"/>, so the glow is never clipped by its window.</summary>
+    public static double Pad(double strength) => strength <= 0 ? BasePad : Math.Max(BasePad, Radius(strength) + PadBeyondRadius);
+}
+
+/// <summary>
+/// The Desk ink setting (settings.json <c>desk_ink</c> <c>{mode, color, shadow, glow, glow_strength}</c>). <paramref name="Color"/>
+/// is the Mac's hex spec (one to four colors, comma separated) and only matters in Custom mode;
+/// <paramref name="Shadow"/> is "Drop shadow under the text"; <paramref name="Glow"/> is "Neon glow" (5.0 spec 5) at
+/// <paramref name="GlowStrength"/>. Glow and shadow are either-or: use <see cref="WithShadow"/> and <see cref="WithGlow"/> to change
+/// one. A missing or odd member reads as its default and an unknown mode as Automatic, so an existing install is unchanged.
+/// </summary>
+public sealed record DeskInkSettings(DeskInkMode Mode, string Color, bool Shadow, bool Glow = false, double GlowStrength = DeskGlow.DefaultStrength)
 {
     public static DeskInkSettings Default { get; } = new(DeskInkMode.Auto, "ffffff", true);
+
+    /// <summary>The shadow switched: on turns the glow off, off leaves the glow as it is.</summary>
+    public DeskInkSettings WithShadow(bool on) => this with { Shadow = on, Glow = !on && Glow };
+
+    /// <summary>The glow switched: on turns the shadow off, off leaves the shadow as it is.</summary>
+    public DeskInkSettings WithGlow(bool on) => this with { Glow = on, Shadow = !on && Shadow };
+
+    /// <summary>The glow's strength, clamped. It is kept while the glow is off.</summary>
+    public DeskInkSettings WithGlowStrength(double strength) => this with { GlowStrength = DeskGlow.Clamp(strength) };
 
     /// <summary>The settings word for <paramref name="mode"/>: "auto", "light", "dark", "theme" or "custom".</summary>
     public static string ModeWord(DeskInkMode mode) => mode switch
@@ -36,26 +83,42 @@ public sealed record DeskInkSettings(DeskInkMode Mode, string Color, bool Shadow
         _ => DeskInkMode.Auto,
     };
 
-    /// <summary>Reads the <c>desk_ink</c> node. Anything that is not an object, and any member of the wrong type, is the default.</summary>
+    /// <summary>Reads the <c>desk_ink</c> node. Anything that is not an object, and any member of the wrong type, is the default.
+    /// A node with both the shadow and the glow on keeps the glow, the newer choice.</summary>
     public static DeskInkSettings Decode(JsonNode? node)
     {
         if (node is not JsonObject o) return Default;
         var mode = DeskInkMode.Auto;
         var color = Default.Color;
         var shadow = Default.Shadow;
+        bool glow = false;
+        double strength = DeskGlow.DefaultStrength;
         if (o["mode"] is JsonValue m && m.TryGetValue<string>(out var word)) mode = ParseMode(word);
         if (o["color"] is JsonValue c && c.TryGetValue<string>(out var spec)) color = spec;
         if (o["shadow"] is JsonValue s && s.TryGetValue<bool>(out var on)) shadow = on;
-        return new DeskInkSettings(mode, color, shadow);
+        if (o["glow"] is JsonValue g && g.TryGetValue<bool>(out var lit)) glow = lit;
+        if (o["glow_strength"] is JsonValue gs)
+        {
+            if (gs.TryGetValue<double>(out var d)) strength = DeskGlow.Clamp(d);
+            else if (gs.TryGetValue<int>(out var i)) strength = DeskGlow.Clamp(i);
+        }
+        return new DeskInkSettings(mode, color, shadow && !glow, glow, strength);
     }
 
-    /// <summary>The <c>desk_ink</c> object with all three members.</summary>
-    public JsonObject Encode() => new()
+    /// <summary>The <c>desk_ink</c> object. <c>glow</c> is written only when on and <c>glow_strength</c> only when it is not the
+    /// default, so an install that never used the glow keeps the three members it always had.</summary>
+    public JsonObject Encode()
     {
-        ["mode"] = ModeWord(Mode),
-        ["color"] = Color,
-        ["shadow"] = Shadow,
-    };
+        var o = new JsonObject
+        {
+            ["mode"] = ModeWord(Mode),
+            ["color"] = Color,
+            ["shadow"] = Shadow,
+        };
+        if (Glow) o["glow"] = true;
+        if (GlowStrength != DeskGlow.DefaultStrength) o["glow_strength"] = GlowStrength;
+        return o;
+    }
 }
 
 /// <summary>
@@ -167,7 +230,15 @@ public static class DeskInkPresets
 /// and the opacity the text is drawn at.
 /// </summary>
 public sealed record ResolvedInk(
-    IReadOnlyList<string> Stops, bool DarkInk, string ShadowHex, double ShadowOpacity, double TextOpacity);
+    IReadOnlyList<string> Stops, bool DarkInk, string ShadowHex, double ShadowOpacity, double TextOpacity)
+{
+    /// <summary>The neon glow's strength (0.2 to 1.0), 0 when the glow is off. A glowing ink has no shadow.</summary>
+    public double Glow { get; init; }
+
+    /// <summary>Draw the glow in one color, the ink's middle stop, instead of a blurred copy of the ink. The Desk sets it for
+    /// a surface where the copy costs too much (under the desktop icons, when the measurement said so); nothing in Core does.</summary>
+    public bool GlowOneColor { get; init; }
+}
 
 /// <summary>Turns the ink setting plus what the desktop looks like into the ink to draw (spec 6.7).</summary>
 public static class DeskInk
@@ -186,9 +257,20 @@ public static class DeskInk
     /// The ink for <paramref name="s"/>. <paramref name="themeTextHex"/> is the widget theme's text color
     /// (Theme mode; null or invalid reads as Light). <paramref name="wallpaperLuminance"/> is the sampled
     /// brightness behind the island (Automatic; null or NaN is unknown, so Light). Theme and Custom inks are
-    /// the user's or the theme's own color, drawn at full opacity.
+    /// the user's or the theme's own color, drawn at full opacity. With the glow on, the ink carries its strength
+    /// and no shadow (<see cref="Glowing"/>).
     /// </summary>
-    public static ResolvedInk Resolve(DeskInkSettings s, string? themeTextHex, double? wallpaperLuminance)
+    public static ResolvedInk Resolve(DeskInkSettings s, string? themeTextHex, double? wallpaperLuminance) =>
+        Glowing(Plain(s, themeTextHex, wallpaperLuminance), s);
+
+    /// <summary>The glow switch of <paramref name="s"/> put on an ink, whoever made it (the Desk's own, or a followed widget
+    /// theme's): on gives the ink the strength and takes its shadow away, since the Desk draws one or the other. Off returns
+    /// <paramref name="ink"/> itself.</summary>
+    public static ResolvedInk Glowing(ResolvedInk ink, DeskInkSettings s) =>
+        s.Glow ? ink with { Glow = DeskGlow.Clamp(s.GlowStrength), ShadowOpacity = 0 } : ink;
+
+    /// <summary>The ink without the glow: the six rules of spec 6.7.</summary>
+    private static ResolvedInk Plain(DeskInkSettings s, string? themeTextHex, double? wallpaperLuminance)
     {
         switch (s.Mode)
         {
@@ -199,13 +281,13 @@ public static class DeskInk
             case DeskInkMode.Theme:
                 if (InkHex.Normalize(themeTextHex) is { } text)
                     return Make([text, text], InkHex.Luminance(text) < 0.5, s.Shadow, 1.0);
-                return Resolve(s with { Mode = DeskInkMode.Light }, null, null);
+                return Plain(s with { Mode = DeskInkMode.Light }, null, null);
             case DeskInkMode.Custom:
                 var stops = InkHex.Stops(s.Color);
                 return Make(stops, InkHex.Luminance(stops[0]) < 0.5, s.Shadow, 1.0);
             default:
                 bool dark = wallpaperLuminance is { } l && !double.IsNaN(l) && l > AutoThreshold;
-                return Resolve(s with { Mode = dark ? DeskInkMode.Dark : DeskInkMode.Light }, null, null);
+                return Plain(s with { Mode = dark ? DeskInkMode.Dark : DeskInkMode.Light }, null, null);
         }
     }
 
