@@ -128,6 +128,8 @@ public static class DeskDesigns
         if (design.Weather is { Nickname.Length: 0 }) o.Remove("weather");
         // Not following is the same look as a design from before theme match.
         if (design.FollowsTheme != true) o.Remove("follows_theme");
+        // No glow is the same look as a design from before the glow (5.0 spec 5).
+        if (design.Glow is not { On: true }) o.Remove("glow");
         if (design.Layout is { } layout)
         {
             var sorted = new JsonObject();

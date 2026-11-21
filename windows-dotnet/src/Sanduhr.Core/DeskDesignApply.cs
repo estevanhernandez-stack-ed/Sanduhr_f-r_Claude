@@ -64,7 +64,13 @@ public static class DeskDesignApply
     /// current custom colors, so choosing Custom again later finds them.</summary>
     public static DeskInkSettings Ink(DeskInkSettings current, DeskDesign design)
     {
-        var next = current with { Shadow = design.Shadow ?? current.Shadow };
+        var next = current;
+        if (design.Shadow is { } shadow) next = next.WithShadow(shadow);
+        if (design.Glow is { } glow)
+        {
+            next = next.WithGlow(glow.On);
+            if (glow is { On: true, Strength: { } strength }) next = next.WithGlowStrength(strength);
+        }
         if (design.Ink is not { } choice) return next;
         switch (choice.Kind)
         {
