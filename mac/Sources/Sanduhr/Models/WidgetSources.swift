@@ -37,6 +37,21 @@ struct WidgetSourcesInput {
     var locale = Locale.current
 }
 
+extension WidgetSourcesInput {
+    /// What the root view feeds the layout: the view model's Claude numbers, Codex's service, the sources' settings.
+    /// One place, so the smoke state reads the layout the widget draws.
+    @MainActor
+    static func live(vm: UsageViewModel, sources: WidgetSourcesState, codex: CodexUsageService, now: Date) -> WidgetSourcesInput {
+        WidgetSourcesInput(
+            claudeOn: vm.usageOn || vm.demo, claudeUsage: vm.shownUsage, hidden: vm.hiddenTiers,
+            codexOn: sources.codexOn,
+            codex: CodexWidgetReading(usage: codex.codexUsage, asOf: codex.asOf, freshTiers: codex.freshTiers,
+                                      emptyState: codex.emptyState),
+            primary: sources.primary, settings: sources.settings, collapsed: sources.collapsed,
+            compact: vm.compact, demo: vm.demo, now: now)
+    }
+}
+
 /// One card of a source's section. Claude's keep their own labels; Codex's say the window.
 struct WidgetSourceCard: Equatable {
     var tier: Tier

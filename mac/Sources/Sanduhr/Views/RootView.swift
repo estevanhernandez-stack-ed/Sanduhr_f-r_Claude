@@ -161,13 +161,7 @@ struct RootView: View {
     /// What the card stack draws for the sources that are on (WidgetSources). With only Claude on it is
     /// today's widget, and the cards above draw exactly as they always have.
     private var sourceLayout: WidgetSourceLayout {
-        WidgetSources.build(WidgetSourcesInput(
-            claudeOn: vm.usageOn || vm.demo, claudeUsage: vm.shownUsage, hidden: vm.hiddenTiers,
-            codexOn: sources.codexOn,
-            codex: CodexWidgetReading(usage: codex.codexUsage, asOf: codex.asOf, freshTiers: codex.freshTiers,
-                                      emptyState: codex.emptyState),
-            primary: sources.primary, settings: sources.settings, collapsed: sources.collapsed,
-            compact: vm.compact, demo: vm.demo, now: Date()))
+        WidgetSources.build(.live(vm: vm, sources: sources, codex: codex, now: Date()))
     }
 
     /// Claude's status line shows while Claude's section does (or Claude alone, as today).

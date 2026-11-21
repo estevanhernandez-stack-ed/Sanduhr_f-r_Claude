@@ -90,7 +90,12 @@ struct AgentBurnDeltas {
 enum FooterText {
     static func make(updated: Date?, mode: String, agentPieces: String, demo: Bool,
                      timeZone: TimeZone = .current) -> String {
-        guard let updated else { return "" }
+        // Claude never updated here (off, or signed out): the agents' pieces alone, so a Mac that tracks only
+        // Codex or the Antigravity CLI still sees their new burn.
+        guard let updated else {
+            guard !demo, agentPieces.hasPrefix(" · ") else { return "" }
+            return String(agentPieces.dropFirst(3))
+        }
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
         f.timeZone = timeZone

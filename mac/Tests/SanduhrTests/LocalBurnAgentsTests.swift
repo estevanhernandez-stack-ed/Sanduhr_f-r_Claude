@@ -78,7 +78,15 @@ struct LocalBurnAgentsTests {
                 == "Updated 4:10 PM · Float · Codex +3.0k · Agy +1.0k")
         #expect(FooterText.make(updated: at, mode: "Pinned", agentPieces: " · Codex +3.0k", demo: true, timeZone: cst)
                 == "Updated 4:10 PM · Pinned")
-        #expect(FooterText.make(updated: nil, mode: "Float", agentPieces: " · Codex +3.0k", demo: false) == "")
+    }
+
+    /// Claude never updated (off, or signed out): the agents' pieces stand alone; nothing new, or demo, is empty.
+    @Test func withNoClaudeUpdateTheFooterIsTheAgentPiecesAlone() {
+        #expect(FooterText.make(updated: nil, mode: "Float", agentPieces: " · Codex +3.0k · Agy +1.0k", demo: false)
+                == "Codex +3.0k · Agy +1.0k")
+        #expect(FooterText.make(updated: nil, mode: "Float", agentPieces: " · Codex +3.0k", demo: false) == "Codex +3.0k")
+        #expect(FooterText.make(updated: nil, mode: "Float", agentPieces: "", demo: false) == "")
+        #expect(FooterText.make(updated: nil, mode: "Float", agentPieces: " · Codex +3.0k", demo: true) == "")
     }
 
     @Test func todaysAgentTotalComesFromTheAgentsRootOnly() {

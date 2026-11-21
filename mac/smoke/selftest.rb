@@ -348,6 +348,19 @@ eq('drawers in the fixture', state['drawers'],
 # Set up Sanduhr: five booleans, nothing else. The fixture is an upgrade that kept its meters.
 eq('setup in the fixture', state['setup'],
    { 'desktop' => true, 'drawers' => false, 'usage' => true, 'migrated' => true, 'pending' => false })
+# Agent sources (2.46.0): the Sources group, the Codex service, the widget layout, the menu bar's text, the footer and the Vault's
+# agent roots. A Claude-only Mac: Codex and Antigravity off, no combined bar, one headerless section, no agent pieces in the footer.
+eq('sources: Claude only, Primary resolved to Claude', [state['sources']['primary'], state['sources'].slice('claude', 'codex', 'antigravity').map { |_, v| v['on'] }], ['claude', [true, false, false]])
+eq('sources: colors are #RRGGBB', state['sources'].reject { |k, _| k == 'primary' }.map { |_, v| v['color'] }, %w[#E0875A #2FB5A3 #7B8CF0])
+eq('sources: consent for the agents, none for Claude Code', state['sources'].reject { |k, _| k == 'primary' }.map { |_, v| v['mcp'] }, [nil, false, false])
+eq('codex block keys', state['codex'].keys, %w[running as_of fresh_tiers empty_state tiers])
+eq('codex tiers are the two windows', state['codex']['tiers'].keys, %w[five_hour seven_day])
+eq('widget sources: no combined bar, one Claude section', [state['widget_sources']['combined'], State.dig(state, 'widget_sources.sections[source=claude].content')], [[], [true, 'cards']])
+eq('widget sources: a section is selectable by source', State.dig(state, 'widget_sources.sections[source=claude].collapsed'), [true, false])
+eq('menu bar display keys', state['menu_bar_display'].keys, %w[text tooltip])
+check('footer is the updated line', state['footer'].start_with?('Updated '))
+eq('no agent roots in the Vault by default', state['vault_agents'], [])
+check('the sources blocks hold no path', %w[sources codex widget_sources menu_bar_display footer vault_agents].none? { |k| state[k].to_s.include?('/') })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
 eq('lock line in the fixture', state['lock_line'].keys, %w[on helper text length])
 eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
@@ -818,7 +831,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config widget-from-file widget-remove]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup sources drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config widget-from-file widget-remove]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

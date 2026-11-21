@@ -71,6 +71,15 @@ struct DebugStateInput {
     var drawers = DrawersDebug()
     /// Set up Sanduhr (2.41.0): the three ticks, whether the migration ran, whether the screen is due.
     var setup = SetupDebug()
+    /// Agent sources (2.46.0): the Sources group's switches, colors, Primary and consents; what the Codex
+    /// service holds; the widget's source layout; the menu bar's text and tooltip; the footer line; the Vault's
+    /// agent roots. Names, counts, percents, colors and times only.
+    var sources = SourcesDebug()
+    var codex = CodexDebug()
+    var widgetSources = WidgetSourcesDebug()
+    var menuBarDisplay = MenuBarDisplayDebug()
+    var footer = ""
+    var vaultAgents: [VaultAgentDebug] = []
     /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
     /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
     var resetDryRun: Reset.Report?
@@ -727,6 +736,12 @@ enum DebugState {
         pairs.append(("drawers", drawersYAML(s.drawers)))
         pairs.append(("setup", setupYAML(s.setup)))
         pairs.append(("reset_dry_run", s.resetDryRun.map(resetDryRunYAML) ?? .null))
+        pairs.append(("sources", sourcesYAML(s.sources)))
+        pairs.append(("codex", codexYAML(s.codex)))
+        pairs.append(("widget_sources", widgetSourcesYAML(s.widgetSources)))
+        pairs.append(("menu_bar_display", menuBarDisplayYAML(s.menuBarDisplay)))
+        pairs.append(("footer", .string(s.footer)))
+        pairs.append(("vault_agents", vaultAgentsYAML(s.vaultAgents)))
         return .object(pairs)
     }
     

@@ -274,3 +274,38 @@ setup:
   migrated: true
   pending: false
 reset_dry_run: null
+sources:
+  primary: claude
+  claude:
+    "on": true
+    color: "#E0875A"
+    mcp: null
+  codex:
+    "on": false
+    color: "#2FB5A3"
+    mcp: false
+  antigravity:
+    "on": false
+    color: "#7B8CF0"
+    mcp: false
+codex:
+  running: false
+  as_of: null
+  fresh_tiers: []
+  empty_state: null
+  tiers:
+    five_hour: null
+    seven_day: null
+widget_sources:
+  combined: []
+  sections:
+    - source: claude
+      collapsed: false
+      content: cards
+      cards: 2
+      as_of: null
+menu_bar_display:
+  text: "42%"
+  tooltip: null
+footer: "Updated 4:10 PM · Float"
+vault_agents: []
