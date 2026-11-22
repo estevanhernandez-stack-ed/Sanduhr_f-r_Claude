@@ -32,10 +32,14 @@ struct AgentWiringWantsTests {
         #expect(bare.claude)
     }
 
-    @Test func claudeSwitchedOffInTheSetupIsOffEvenWithTheHook() {
+    @Test func claudeCodeFollowsTheHookNotTheClaudeUsageSource() {
+        // Usage off (a Just the Desk Mac, or Codex only) with the updated hook: Claude Code is still on.
         let codexOnly = SetupSettings(desktop: true, usage: [SetupSettings.claude: false, SetupSettings.codex: true])
         let w = AgentNotificationsWiring.wants(setup: codexOnly, sources: sources(), demo: false, hookInstalled: true)
-        #expect(w == (claude: false, codex: true, antigravity: false))
+        #expect(w == (claude: true, codex: true, antigravity: false))
+        let none = SetupSettings(desktop: true, usage: [SetupSettings.claude: false])
+        #expect(AgentNotificationsWiring.wants(setup: none, sources: sources(), demo: false, hookInstalled: true).claude)
+        #expect(!AgentNotificationsWiring.wants(setup: none, sources: sources(), demo: false, hookInstalled: false).claude)
     }
 
     @Test func codexAndAntigravityFollowTheirSources() {

@@ -340,7 +340,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let setup = SetupStore.load()
         let sources = AgentSourceSettings.load()
         let demo = viewModel.demo
-        let hooked = !demo && sources.isOn(.claude, setup: setup) && agentHookInstalled()
+        let hooked = !demo && agentHookInstalled()
         let was = agentWants
         let now = AgentNotificationsWiring.wants(setup: setup, sources: sources, demo: demo, hookInstalled: hooked)
         agentWants = now

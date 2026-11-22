@@ -13,12 +13,14 @@ enum AgentNotificationsWiring {
     /// Which agents the watcher follows.
     typealias Wants = (claude: Bool, codex: Bool, antigravity: Bool)
 
-    /// An agent is followed only while its source is on, and never in demo mode (demo's samples are
-    /// no agent activity). Claude Code is on only with the updated hook (`hookInstalled`), so a 2.46-shaped Mac
-    /// (hook not updated, Codex and Antigravity off) follows nothing: no stream, no timer, no file read.
+    /// Codex and Antigravity are followed only while their sources are on, and nothing in demo mode (demo's
+    /// samples are no agent activity). Claude Code follows the updated hook (`hookInstalled`) alone, not the
+    /// Claude usage source: that switch is about claude.ai limits, and a Mac with usage off still runs Claude
+    /// Code. A 2.46-shaped Mac (hook not updated, Codex and Antigravity off) follows nothing: no stream, no
+    /// timer, no file read.
     static func wants(setup: SetupSettings?, sources: AgentSourceSettings, demo: Bool, hookInstalled: Bool) -> Wants {
         guard !demo else { return (false, false, false) }
-        return (claude: hookInstalled && sources.isOn(.claude, setup: setup),
+        return (claude: hookInstalled,
                 codex: sources.isOn(.codex, setup: setup),
                 antigravity: sources.isOn(.antigravity, setup: setup))
     }
