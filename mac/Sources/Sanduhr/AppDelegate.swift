@@ -41,6 +41,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// notifications, never a launch); registered for the life of the app.
     private var claudeCodeSignal: ClaudeCodeSignal?
 
+    // MARK: Agent notifications (2.47.0)
+
+    /// Which agents the watcher follows now (`syncAgentNotifications`). The notifier's `isOn` reads it, so an
+    /// agent switched off raises nothing even for an event already on its way.
+    private var agentWants: AgentNotificationsWiring.Wants = (false, false, false)
+    /// Follows Codex's and the Antigravity CLI's files and Claude Code's signal files. Creating it starts no
+    /// stream and no timer: `update` does, and only for what is on.
+    private lazy var agentWatcher = AgentActivityWatcher(
+        homes: .live(), files: TurnDisk(), clock: Date.init, ticker: TimerTicker(),
+        events: { [weak self] in self?.agentNotifier.handle($0) })
+    /// Applies the rules to each turn event and calls the notification, the glow and the Desk card.
+    private lazy var agentNotifier = AgentNotifier(
+        settings: { AgentNotificationsWiring.interimSettings(desk: UserDefaults.desk, standard: UserDefaults.standard) },
+        banner: { Notifier.shared.postAgent($0) },
+        glow: { NotchGlowController.shared.fire(topFallback: true, color: $0) },
+        card: { WatcherStore.shared.applyTurn($0) },
+        front: .workspace, clock: Date.init,
+        isOn: { [weak self] agent in
+            switch agent {
+            case .claude: self?.agentWants.claude ?? false
+            case .codex: self?.agentWants.codex ?? false
+            case .antigravity: self?.agentWants.antigravity ?? false
+            }
+        })
+
     // MARK: Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -152,6 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.renderStatusItem()
             }
         }
+        // Claude Code's hook was installed, updated or removed: its notifications follow the updated hook.
+        NotificationCenter.default.addObserver(forName: .sanduhrHooksDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.syncAgentNotifications() }
+        }
         // Settings, Usage, Sources: a color, Primary or Antigravity's switch changed.
         NotificationCenter.default.addObserver(forName: .sanduhrSourcesDidChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -238,8 +267,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         BandFileWriter.shared.startForApp()
         // Claude Code's hooks (items 51, 66): their Darwin notifications go where the
         // sanduhr://claude-code link goes.
-        claudeCodeSignal = ClaudeCodeSignal { event in
-            MainActor.assumeIsolated { NotchGlowController.shared.claudeCode(event) }
+        // A post whose signal files the watcher found takes the new path; a bare one is an older hook's, and
+        // only its waiting and done posts glow, as in 2.46 (AgentNotificationsWiring.handlePost).
+        claudeCodeSignal = ClaudeCodeSignal { [weak self] event in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                AgentNotificationsWiring.handlePost(
+                    event, posted: { self.agentWatcher.claudeCodePosted() },
+                    legacyGlow: { NotchGlowController.shared.claudeCode($0) })
+            }
         }
         // Claude Code integrations (item 49): where they are installed, this version's scripts
         // replace the last one's (a new stamped folder, the link swapped). No install, no write.
@@ -293,6 +329,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         codexUsage.update(on: CodexUsageService.wants(
             setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
         syncDeskSources()
+        syncAgentNotifications()
+    }
+
+    /// Starts and stops what follows the agents from the stored setup, the Sources switches, demo mode and the
+    /// hook's state. Idempotent, and called on every one of those changes (and each usage refresh), so a home
+    /// that appears later is noticed. A Mac with the hook not updated and Codex and Antigravity off follows
+    /// nothing: no stream, no timer, and not even a read of the hook's folders beyond the settings files.
+    private func syncAgentNotifications() {
+        let setup = SetupStore.load()
+        let sources = AgentSourceSettings.load()
+        let demo = viewModel.demo
+        let hooked = !demo && agentHookInstalled()
+        let was = agentWants
+        let now = AgentNotificationsWiring.wants(setup: setup, sources: sources, demo: demo, hookInstalled: hooked)
+        agentWants = now
+        agentWatcher.update(codexOn: now.codex, antigravityOn: now.antigravity, claudeOn: now.claude)
+        // An agent switched off takes its turn cards and its notifier memory with it (no event says so).
+        for (agent, before, after) in [(AgentSource.claude, was.claude, now.claude),
+                                       (.codex, was.codex, now.codex),
+                                       (.antigravity, was.antigravity, now.antigravity)] where before && !after {
+            WatcherStore.shared.clear(agent: agent)
+            agentNotifier.forget(agent)
+        }
+    }
+
+    /// Whether the 2.47 hook is current in at least one folder Sanduhr knows (found, linked to an account,
+    /// installed into, or added by hand). Reads only the settings files.
+    private func agentHookInstalled() -> Bool {
+        let installer = IntegrationInstaller.standard
+        var paths = ClaudeCodeFolders.discover(home: NSHomeDirectory(),
+                                               environment: ProcessInfo.processInfo.environment).map(\.path)
+        let linked = viewModel.realAccountLabels.compactMap { viewModel.dataChoices(for: $0).folder }
+        for p in linked + installer.installedFolders() + SeatPreferences.added(in: KeychainStore.accounts.defaults) {
+            let n = AccountData.normalized(p)
+            if !paths.contains(n) { paths.append(n) }
+        }
+        return AgentNotificationsWiring.hookInstalled(folders: paths) { installer.status(.hooks, folder: $0) }
     }
 
     /// Tells the Desk which sources are on and what Codex read, so its Claude pieces can show Codex or both.

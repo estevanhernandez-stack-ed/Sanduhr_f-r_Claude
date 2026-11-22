@@ -382,11 +382,14 @@ final class AgentActivityWatcher {
     private func set(_ agent: AgentSource, _ on: Bool, _ now: Date) {
         let following = firstPass[agent] != nil
         if on && !following { follow(agent, now) }
+        // Still on: a home that appeared since (Codex installed later) is followed now, with a silent first
+        // pass of its own. A home already followed is left alone, and so is the launch time of the pass.
+        if on && following { follow(agent, now, keepingPass: true) }
         if !on && following { unfollow(agent) }
     }
 
-    private func follow(_ agent: AgentSource, _ now: Date) {
-        firstPass[agent] = now
+    private func follow(_ agent: AgentSource, _ now: Date, keepingPass: Bool = false) {
+        if !keepingPass { firstPass[agent] = now }
         let list = agent == .codex ? homes.codex : [homes.antigravity]
         for home in list where files.isFolder(home) {
             let key = home.standardizedFileURL.path
