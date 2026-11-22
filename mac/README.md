@@ -1828,6 +1828,23 @@ Items…**. Turning a stalled helper off unregisters it at once instead of waiti
 will never clear the line, and says the old line stays until a running helper clears it
 (`stalledOff`). A refused registration (`EPERM`) gets the same Login Items steps instead of
 macOS's sentence.
+
+**On but not registered (2.47.1, #356).** On the owner's Mac the helper stopped on 2026-11-03 and
+nobody knew for 19 days: after a Login Items toggle macOS reported `.notRegistered` while the switch
+stayed on, and the caption read Off. `LockLineDaemon.state(enabled:status:legacy:)` now takes the
+switch: on and not registered (with no 2.33.0 helper enabled) is `.unregistered`, off and not
+registered stays `.off`, and needs approval wins whatever the switch or the legacy helper say. The
+caption says the helper isn't registered and the lock screen keeps an old line, with **Turn it on
+again**, which runs the switch's own install path and shows `installProblem` when macOS refuses.
+`LockLineController.checkWarning` posts "The lock screen line stopped updating." (identifier
+`lockline-stopped`, a click opens Settings, Lock Screen) when `LockLineDaemon.shouldWarn` says so:
+the switch on, the state `.stalled` or `.unregistered`, the 3-minute judge window past since launch,
+a wake or a registration, demo mode off, outside Alerts' quiet hours, and none in the last 24 hours
+(`lockLineWarnedAt` in the Desk defaults, a date). It is checked at launch, on wake and on the
+5-minute recompose; quiet hours record nothing, so the first check after them fires. It never
+registers on its own: a register Sanduhr starts may bring an unexpected password prompt, and
+2.39.3 saw macOS refuse one without the user's OK. `state.yaml` `lock_line.helper` reads
+`unregistered`.
 ## Now playing
 
 Now playing (items 53, 53b) shows what plays on the Mac, in any app that publishes now playing
