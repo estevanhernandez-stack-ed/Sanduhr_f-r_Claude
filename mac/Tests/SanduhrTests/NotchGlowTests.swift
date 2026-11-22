@@ -324,3 +324,23 @@ struct NotchGlowStripTests {
         #expect(NotchCoverWindow(info: [kCGWindowBounds as String: ["X": 0.0, "Y": 0.0, "Width": 1.0, "Height": 1.0]]) == nil)
     }
 }
+
+/// Agent notifications (plan Task 5): a finished or stopped turn glows in the agent's Sources color; every other glow
+/// keeps the notch ink, as before.
+@Suite("Notch glow color")
+struct NotchGlowColorTests {
+    @Test func noColorKeepsTheNotchInk() {
+        #expect(NotchGlowInk.resolve(color: nil, ink: "ffffff") == "ffffff")
+        #expect(NotchGlowInk.resolve(color: nil, ink: "531b93,012089") == "531b93,012089")
+    }
+
+    @Test func anAgentColorReplacesTheInk() {
+        #expect(NotchGlowInk.resolve(color: "#E0875A", ink: "ffffff") == "e0875a")
+        #expect(NotchGlowInk.resolve(color: "2FB5A3", ink: "531b93,012089") == "2fb5a3")
+    }
+
+    @Test func aColorThatIsNotOneKeepsTheInk() {
+        #expect(NotchGlowInk.resolve(color: "orange", ink: "ffffff") == "ffffff")
+        #expect(NotchGlowInk.resolve(color: "", ink: "ffffff") == "ffffff")
+    }
+}
