@@ -38,9 +38,13 @@ enum LockLineDaemon {
         /// `restartSteps` (2.39.3).
         case stalled
         case missing
+        /// The switch is on but macOS has no registration (2.47.1, #356): a Login Items toggle, or a
+        /// registration macOS dropped. The lock screen keeps the helper's last line. Only the user
+        /// brings it back, with **Turn it on again**; Sanduhr never registers on its own.
+        case unregistered
     }
 
-    static func state(_ status: SMAppService.Status) -> State {
+    nonisolated static func state(_ status: SMAppService.Status) -> State {
         switch status {
         case .enabled: .on
         case .requiresApproval: .needsApproval
@@ -51,23 +55,58 @@ enum LockLineDaemon {
 
     /// A 2.33.0 helper still registered counts as on, so its switch reads true and turning it
     /// off removes it.
-    static func state(_ status: SMAppService.Status, legacy: SMAppService.Status) -> State {
+    nonisolated static func state(_ status: SMAppService.Status, legacy: SMAppService.Status) -> State {
         let current = state(status)
         return current == .off && legacy == .enabled ? .on : current
     }
 
-    static var state: State {
-        let base = state(service.status, legacy: legacy.status)
-        guard base == .on, stalled(heartbeat: heartbeat(), watchingSince: watchingSince, now: Date()) else { return base }
+    /// With the switch: on and not registered (nor a 2.33.0 helper still enabled) is `.unregistered`;
+    /// off and not registered stays `.off`.
+    nonisolated static func state(enabled: Bool, status: SMAppService.Status, legacy: SMAppService.Status) -> State {
+        let current = state(status, legacy: legacy)
+        return enabled && current == .off ? .unregistered : current
+    }
+
+    /// The whole judge: the switch, macOS's statuses, then the heartbeat for a helper that reads on.
+    nonisolated static func state(enabled: Bool, status: SMAppService.Status, legacy: SMAppService.Status,
+                                  heartbeat: Date?, watchingSince: Date, now: Date) -> State {
+        let base = state(enabled: enabled, status: status, legacy: legacy)
+        guard base == .on, stalled(heartbeat: heartbeat, watchingSince: watchingSince, now: now) else { return base }
         return .stalled
+    }
+
+    static var state: State {
+        state(enabled: UserDefaults.desk.bool(forKey: LockLineKeys.on), status: service.status,
+              legacy: legacy.status, heartbeat: heartbeat(), watchingSince: watchingSince, now: Date())
+    }
+
+    // MARK: The line stopped updating (2.47.1, #356)
+
+    /// The notification's identifier; a click on it opens Settings, Lock Screen (Notifier.clickTarget).
+    nonisolated static let warningID = "lockline-stopped"
+    nonisolated static let warningTitle = "The lock screen line stopped updating."
+    nonisolated static let warningBody = "Settings, Lock Screen says how to bring it back."
+    /// At most one warning in this long.
+    nonisolated static let warnEvery: TimeInterval = 24 * 60 * 60
+
+    /// Whether to post the warning now: the switch on, the helper stalled or not registered, the
+    /// judge window past since launch, a wake or a registration, not in demo mode, not in Alerts'
+    /// quiet hours (the caller records nothing then, so the next check after them fires), and
+    /// none in the last 24 hours. Checked at launch, on wake and on the 5-minute recompose.
+    nonisolated static func shouldWarn(state: State, enabled: Bool, demo: Bool, quiet: Bool, lastWarned: Date?,
+                                       now: Date, watchingSince: Date) -> Bool {
+        guard enabled, !demo, !quiet, state == .stalled || state == .unregistered else { return false }
+        guard now.timeIntervalSince(watchingSince) >= judgeAfter else { return false }
+        guard let lastWarned else { return true }
+        return now.timeIntervalSince(lastWarned) >= warnEvery
     }
 
     // MARK: Is launchd still running it?
 
     /// The helper runs once a minute; a heartbeat older than this means it does not.
-    static let heartbeatMaxAge: TimeInterval = 5 * 60
+    nonisolated static let heartbeatMaxAge: TimeInterval = 5 * 60
     /// How long the app watches (since launch, a wake or a registration) before it judges.
-    static let judgeAfter: TimeInterval = 3 * 60
+    nonisolated static let judgeAfter: TimeInterval = 3 * 60
 
     /// Since when the helper could have run while the app watched: launch, the last wake, the last
     /// registration. A sleeping Mac runs nothing, so a wake starts the count again.
@@ -99,8 +138,12 @@ enum LockLineDaemon {
         case .needsApproval: "macOS needs your OK: System Settings, General, Login Items, allow Sanduhr in the background."
         case .missing: "This copy of Sanduhr has no lock screen helper in it."
         case .off: "Off. Turning it on asks for an administrator password once, to put the line on the lock screen."
+        case .unregistered: "The lock screen helper isn't registered, so the lock screen keeps an old line."
         }
     }
+
+    /// The button under `.unregistered`'s caption: the switch's own install path.
+    static let turnOnAgain = "Turn it on again"
 
     /// Registers the helper. Throws what macOS says when it refuses (an unsigned build, a denied
     /// password), for Settings to show.
@@ -151,7 +194,7 @@ enum LockLineDaemon {
     static func installProblem(_ error: Error, after state: State) -> String? {
         switch state {
         case .on, .needsApproval: nil
-        case .off, .missing, .stalled:
+        case .off, .missing, .stalled, .unregistered:
             refused(error)
                 ? "macOS didn't let Sanduhr start the lock screen helper. In Login Items, switch Sanduhr off and on under Allow in the Background (macOS asks for your password), then turn this switch off and on."
                 : "macOS did not install the lock screen helper: \(error.localizedDescription)"

@@ -218,8 +218,8 @@ struct NotchPillDebug: Equatable {
 /// character count.
 struct LockLineDebug: Equatable {
     var on = false
-    /// The helper as macOS and its heartbeat have it (LockLineDaemon.State): off, on, stalled,
-    /// needs_approval or missing.
+    /// The helper as macOS, its heartbeat and the switch have it (LockLineDaemon.State): off, on,
+    /// stalled, needs_approval, missing or unregistered (the switch on, no registration; 2.47.1).
     var helper = "off"
     var text = ""
     var length: Int { text.count }
