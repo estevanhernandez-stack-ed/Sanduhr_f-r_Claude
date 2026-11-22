@@ -361,6 +361,17 @@ eq('menu bar display keys', state['menu_bar_display'].keys, %w[text tooltip])
 check('footer is the updated line', state['footer'].start_with?('Updated '))
 eq('no agent roots in the Vault by default', state['vault_agents'], [])
 check('the sources blocks hold no path', %w[sources codex widget_sources menu_bar_display footer vault_agents].none? { |k| state[k].to_s.include?('/') })
+# Agent notifications (2.47.0): the settings the rules read and the last decision, the agent turn cards and what the watcher
+# follows. A Claude-only Mac that has not seen an event: the defaults, no last decision, no cards, nothing followed.
+eq('agent notifications: the settings keys', state['agent_notifications'].keys,
+   %w[banner card glow_finished glow_waiting skip_in_front idle threshold quiet_hours events last])
+eq('agent notifications: the defaults before any event',
+   state['agent_notifications'].reject { |k, _| k == 'last' },
+   { 'banner' => true, 'card' => true, 'glow_finished' => false, 'glow_waiting' => false, 'skip_in_front' => true,
+     'idle' => false, 'threshold' => 60, 'quiet_hours' => false, 'events' => 0 })
+eq('agent notifications: no last decision before an event', state['agent_notifications']['last'], nil)
+eq('no turn cards and nothing followed in the fixture', [state['turn_cards'], state['agent_watch']], [[], []])
+check('the agent notification blocks hold no path', %w[agent_notifications turn_cards agent_watch].none? { |k| state[k].to_s.include?('/') })
 # #137: the lock screen line is off in the fixture, its switch key quoted like the pill's.
 eq('lock line in the fixture', state['lock_line'].keys, %w[on helper text length])
 eq('lock line is off and as long as its text', [state['lock_line']['on'], state['lock_line']['length']],
@@ -831,7 +842,7 @@ Dir[File.join(Smoke::SCENARIOS, '*.yaml')].sort.each do |f|
     kinds = s.is_a?(Hash) ? s.keys & Runner::STEP_KINDS : []
     check("#{name}: step #{i + 1} has one known kind", kinds.length == 1)
     next unless kinds == ['do']
-    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup sources drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config widget-from-file widget-remove]
+    known = %w[show-widget hide-widget settings settings-link settings-search close-settings refresh test-alert pulse tool desk notch notch-pill just-the-desk setup sources notify drawers camera-light glow theme demo account usage whats-new close-whats-new tour tour-step close-tour watch-test av-test message-editor desk-arrange hot-key reset mods-config widget-from-file widget-remove]
     check("#{name}: step #{i + 1} action #{s['do']}", known.include?(s['do']))
   end
 end

@@ -343,7 +343,7 @@ struct DebugStateTests {
                          "temporary_limits", "silenced_limits", "meetings_count", "desk_frames", "desk_frames_ok", "desk_frames_problem", "desk_piece_clicks", "desk_plate", "desk_under_icons", "oled_care", "dock", "alerts",
                          "last_fetch", "active_tool", "pacing_pinned", "pulse_count", "glow_count", "glow_shape", "glow_alerts", "glow_meetings",
                          "glow_camera", "glow_claude_waiting", "glow_claude_done", "theme", "menu", "menu_submenus", "credentials_store", "account_ref", "accounts_count", "plan", "history_days", "data",
-                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "setup", "reset_dry_run", "sources", "codex", "widget_sources", "menu_bar_display", "footer", "vault_agents"])
+                         "local_activity", "vault", "integrations", "pending_suggestions", "follow", "follow_paused", "snapshots", "seats", "version", "build", "whats_new", "tour", "watchers", "av_indicators", "settings_preview", "settings_preview_folded", "mods_page", "mods_config", "message_editor", "hot_keys", "meter_history", "lock_line", "just_the_desk", "demo", "drawers", "setup", "reset_dry_run", "sources", "codex", "widget_sources", "menu_bar_display", "footer", "vault_agents", "agent_notifications", "turn_cards", "agent_watch"])
         #expect(yaml.contains("just_the_desk: false\ndemo:\n"))
         #expect(yaml.contains("\nreset_dry_run: null\nsources:\n"))
         #expect(yaml.contains("settings_section: notch\nsettings_anchor: null\nsettings_anchor_visible: null\nusage_page:\n  open: false\n  tab: overview\nmeters:"))
@@ -709,5 +709,188 @@ struct DebugSmokeFixtureZipTests {
         guard case .installed(let m, _) = WidgetFileInstall.install(zip: good, store: store) else { Issue.record("good zip refused"); return }
         #expect(m.id == "good-sprite" && m.name == "Fixture sprite")
         #expect(store.load().find("good-sprite")?.source == .local)
+    }
+}
+
+/// The smoke hooks for agent notifications (2.47.0): the `notify` action's words and refusals, and the three
+/// state.yaml blocks (`agent_notifications`, `turn_cards`, `agent_watch`). Counts, names and times only.
+@Suite("Agent notification debug hooks")
+struct DebugAgentNotificationsTests {
+    private func notify(_ arg: String?) -> DebugNotify? {
+        if case .success(.notify(let n)) = DebugLink.action("notify", arg: arg) { return n }
+        return nil
+    }
+
+    // MARK: Parsing
+
+    @Test func aTurnEventParsesWithItsWords() {
+        #expect(notify("agent=codex kind=finished session=s1 project=alpha duration=252")
+                == .turn(agent: .codex, kind: .finished, session: "s1", project: "alpha", duration: 252))
+        #expect(notify("AGENT=Claude Kind=Waiting")
+                == .turn(agent: .claude, kind: .waiting, session: DebugNotify.defaultSession, project: nil, duration: nil))
+        #expect(notify("agent=antigravity,kind=stopped,duration=0.5")
+                == .turn(agent: .antigravity, kind: .stopped, session: DebugNotify.defaultSession, project: nil, duration: 0.5))
+        for (word, kind) in [("started", AgentTurnEvent.Kind.started), ("finished", .finished), ("stopped", .stopped),
+                             ("waiting", .waiting), ("idle", .idle)] {
+            #expect(notify("agent=claude kind=\(word)")
+                    == .turn(agent: .claude, kind: kind, session: DebugNotify.defaultSession, project: nil, duration: nil))
+        }
+        // A duration the board would not believe (negative, past a day) still parses: the smoke checks the card's clamp.
+        #expect(notify("agent=codex kind=finished duration=-5")
+                == .turn(agent: .codex, kind: .finished, session: DebugNotify.defaultSession, project: nil, duration: -5))
+        #expect(notify("agent=codex kind=finished duration=999999")
+                == .turn(agent: .codex, kind: .finished, session: DebugNotify.defaultSession, project: nil, duration: 999999))
+        // A project and a session keep their case; every word may come in any order.
+        #expect(notify("project=MyApp session=Run-2 kind=started agent=codex")
+                == .turn(agent: .codex, kind: .started, session: "Run-2", project: "MyApp", duration: nil))
+    }
+
+    @Test func aPostParsesAsTheDarwinRoutingWouldRunIt() {
+        #expect(notify("kind=post event=prompt") == .post(.prompt))
+        #expect(notify("kind=POST event=Waiting") == .post(.waiting))
+        #expect(notify("event=done kind=post") == .post(.done))
+    }
+
+    @Test func theNotifyActionRefusesWhatItCannotRead() {
+        for arg in [nil, "", "agent=codex", "kind=finished", "agent=gemini kind=finished", "agent=codex kind=done",
+                    "agent=codex kind=maybe", "agent=codex kind=finished duration=abc", "agent=codex kind=finished duration=",
+                    "agent=codex kind=finished duration=inf", "agent=codex kind=finished duration=nan",
+                    "agent=codex kind=finished agent=claude",
+                    "agent=codex kind=finished color=red", "agent=codex kind=finished private",
+                    "agent=codex kind=finished session=", "agent=codex kind=finished project=",
+                    "kind=post", "kind=post event=idle", "kind=post event=finished",
+                    "kind=post event=done agent=claude", "kind=post event=done session=s", "kind=post event=done duration=3",
+                    "agent=claude kind=finished event=done"] {
+            if case .success = DebugLink.action("notify", arg: arg) { Issue.record("accepted \(arg ?? "nil")") }
+        }
+        if case .failure(let e) = DebugLink.action("notify", arg: nil) {
+            #expect(e.message.contains("agent=claude|codex|antigravity"))
+            #expect(e.message.contains("kind=post"))
+        } else { Issue.record("empty notify accepted") }
+    }
+
+    @Test func aNotifyLinkReachesTheAction() {
+        let url = URL(string: "sanduhr://debug/action?name=notify&arg=agent%3Dcodex%20kind%3Dfinished%20project%3Dalpha%20duration%3D90&dir=/tmp/x")!
+        let request = DebugLink.parse(url)
+        #expect(request.error == nil)
+        #expect(request.command == .action(.notify(.turn(agent: .codex, kind: .finished, session: DebugNotify.defaultSession,
+                                                         project: "alpha", duration: 90)), dir: "/tmp/x"))
+        #expect(DebugAction.names.contains("notify"))
+    }
+
+    @Test func aTurnBecomesTheEventTheNotifierSees() {
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let n = DebugNotify.turn(agent: .codex, kind: .finished, session: "s1", project: "alpha", duration: 252)
+        #expect(n.event(at: at) == AgentTurnEvent(agent: .codex, kind: .finished, project: "alpha", session: "s1", at: at, duration: 252))
+        #expect(DebugNotify.post(.done).event(at: at) == nil)
+    }
+
+    // MARK: agent_notifications
+
+    @Test func theLastDecisionCarriesTheFlagsAndTheWordsOfAPostedBanner() {
+        let e = AgentTurnEvent(agent: .codex, kind: .finished, project: "alpha", session: "s1",
+                               at: Date(timeIntervalSince1970: 0), duration: 252)
+        let last = AgentNotificationsDebug.Last.of(
+            e, NotificationDecision(banner: true, glow: true, card: true, glowColorHex: "#2FB5A3"))
+        #expect(last == .init(agent: "codex", kind: "finished", banner: true, glow: true, card: true,
+                              glowColor: "#2FB5A3", title: "Codex finished", body: "alpha, 4m 12s"))
+        // No banner posted: no words, as nothing was said.
+        let quiet = AgentNotificationsDebug.Last.of(e, .none)
+        #expect(quiet.banner == false && quiet.title == nil && quiet.body == nil && quiet.glowColor == nil)
+        // Claude Code is named as a person knows it; waiting carries the project alone.
+        let waiting = AgentTurnEvent(agent: .claude, kind: .waiting, project: "beta", session: "s", at: Date(timeIntervalSince1970: 0), duration: 9)
+        let w = AgentNotificationsDebug.Last.of(waiting, NotificationDecision(banner: true, glow: false, card: true, glowColorHex: nil))
+        #expect(w.agent == "claude" && w.kind == "waiting" && w.title == "Claude Code is waiting on you" && w.body == "beta")
+    }
+
+    @Test func theAgentNotificationsBlockReadsTheSettingsAndTheLastDecision() {
+        var settings = NotificationSettings()
+        settings.threshold = 120
+        settings.idle = true
+        settings.glowFinished = true
+        settings.quiet = (true, 22, 7)
+        let last = AgentNotificationsDebug.Last(agent: "codex", kind: "finished", banner: true, glow: false, card: true,
+                                                glowColor: nil, title: "Codex finished", body: "alpha, 4m 12s")
+        let block = AgentNotificationsDebug.of(settings: settings, events: 3, last: last)
+        #expect(YAMLEmitter.emit(DebugState.agentNotificationsYAML(block)) == """
+        banner: true
+        card: true
+        glow_finished: true
+        glow_waiting: false
+        skip_in_front: true
+        idle: true
+        threshold: 120
+        quiet_hours: true
+        events: 3
+        last:
+          agent: codex
+          kind: finished
+          banner: true
+          glow: false
+          card: true
+          glow_color: null
+          title: Codex finished
+          body: "alpha, 4m 12s"
+
+        """)
+        // Before any event: the defaults and no last decision.
+        let fresh = YAMLEmitter.emit(DebugState.agentNotificationsYAML(.of(settings: NotificationSettings(), events: 0, last: nil)))
+        #expect(fresh == "banner: true\ncard: true\nglow_finished: false\nglow_waiting: false\nskip_in_front: true\nidle: false\nthreshold: 60\nquiet_hours: false\nevents: 0\nlast: null\n")
+    }
+
+    // MARK: turn_cards
+
+    @Test func turnCardsListAgentProjectStateAndSeconds() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        var board = WatcherBoard()
+        board.applyTurn(AgentTurnEvent(agent: .codex, kind: .started, project: "alpha", session: "s1", at: now.addingTimeInterval(-65), duration: nil), now: now)
+        board.applyTurn(AgentTurnEvent(agent: .claude, kind: .waiting, project: nil, session: "s2", at: now, duration: nil), now: now)
+        board.apply(.start(id: "other", title: "Smoke watcher", link: nil, total: nil, work: false, short: nil), now: now)
+        let rows = TurnCardDebug.rows(board.watchers, now: now)
+        #expect(rows == [TurnCardDebug(agent: "codex", project: "alpha", state: "running", seconds: 65),
+                         TurnCardDebug(agent: "claude", project: nil, state: "waiting", seconds: 0)])
+        #expect(YAMLEmitter.emit(DebugState.turnCardsYAML(rows)) == """
+        - agent: codex
+          project: alpha
+          state: running
+          seconds: 65
+        - agent: claude
+          project: null
+          state: waiting
+          seconds: 0
+
+        """)
+        #expect(YAMLEmitter.emit(DebugState.turnCardsYAML([])) == "[]\n")
+    }
+
+    // MARK: agent_watch
+
+    @Test func agentWatchNamesTheFolderWithALabelAndNeverAPath() {
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent("agent-watch-\(UUID().uuidString)", isDirectory: true)
+        let followed: [AgentActivityWatcher.FollowedFolder] = [
+            .init(agent: .codex, folder: home.appendingPathComponent("codex-a"), polling: false),
+            .init(agent: .codex, folder: home.appendingPathComponent("codex-b"), polling: true),
+            .init(agent: .antigravity, folder: home.appendingPathComponent("agy"), polling: true),
+        ]
+        let rows = AgentWatchDebug.rows(followed: followed, claudeSignals: true)
+        #expect(rows == [AgentWatchDebug(agent: "codex", folder: "codex home", mode: "fsevents"),
+                         AgentWatchDebug(agent: "codex", folder: "codex home 2", mode: "polling"),
+                         AgentWatchDebug(agent: "antigravity", folder: "antigravity cli", mode: "polling"),
+                         AgentWatchDebug(agent: "claude", folder: "signals", mode: "post")])
+        let yaml = YAMLEmitter.emit(DebugState.agentWatchYAML(rows))
+        #expect(yaml.hasPrefix("- agent: codex\n  folder: codex home\n  mode: fsevents\n"))
+        #expect(!yaml.contains("/") && !yaml.contains(home.lastPathComponent))
+        #expect(AgentWatchDebug.rows(followed: [], claudeSignals: false).isEmpty)
+        #expect(YAMLEmitter.emit(DebugState.agentWatchYAML([])) == "[]\n")
+    }
+
+    @Test func theThreeBlocksSitAfterTheVaultAgentsAndHoldNoPath() {
+        var s = DebugStateInput()
+        s.agentNotifications = .of(settings: NotificationSettings(), events: 0, last: nil)
+        let yaml = YAMLEmitter.emit(DebugState.yaml(s))
+        #expect(yaml.contains("\nvault_agents: []\nagent_notifications:\n  banner: true\n"))
+        #expect(yaml.hasSuffix("turn_cards: []\nagent_watch: []\n"))
+        let tail = yaml.components(separatedBy: "\nagent_notifications:\n").last ?? ""
+        #expect(!tail.contains("/Users/") && !tail.contains("~/"))
     }
 }
