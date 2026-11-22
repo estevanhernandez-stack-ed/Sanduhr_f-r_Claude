@@ -707,6 +707,12 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 
 The installed hooks post a Darwin notification (`/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` or `.done`): every running Sanduhr hears it, a dev build too, and nothing is ever launched. A `sanduhr://` link, which the steps below also use, goes to the default app for the scheme and can launch the installed copy: aim link tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`.
 
+*2.47.0 widened these labels and the hook: the switches below are Settings, Notch, Glow's "When an agent is waiting on you", "When an agent
+finishes" and "Not while the agent's app is in front" (the same switches as Settings, Notifications). The hook now has a third event, `UserPromptSubmit`,
+and writes a signal file before posting; where a step here counts entries or quotes the old command, the updated hook has three lists and its
+command runs `osascript`, and a bare post (the `notifyutil` and `sanduhr://` commands below, sent by hand) still glows exactly as before. Section 81
+covers the notification, the card and the signal files.*
+
 Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
 
 ```sh
@@ -715,17 +721,17 @@ printf '{\n  "hooks": {\n    "Stop": [\n      {\n        "hooks": [\n          {
 cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
 ```
 
-- [ ] The link alone, before any install: Settings, Notch, Notch glow, the two Claude Code switches
+- [ ] The link alone, before any install: Settings, Notch, Notch glow, the two agent switches
   off. Bring Finder to the front and run `open -g 'sanduhr://claude-code?event=waiting'` from a
-  script or another Mac app (or with "Not while a terminal is in front" off): nothing glows.
-  Turn "When Claude Code is waiting on you" on: the same command glows the notch once within a
+  script or another Mac app (or with "Not while the agent's app is in front" off): nothing glows.
+  Turn "When an agent is waiting on you" on: the same command glows the notch once within a
   second (around the island with the notch on, around the hardware notch with it off). Again
   within 20 seconds: no glow; after 20 seconds: one glow.
-- [ ] `event=done` with "When Claude Code finishes" on glows once, but not within 5 seconds of a
+- [ ] `event=done` with "When an agent finishes" on glows once, but not within 5 seconds of a
   waiting glow. `open -g 'sanduhr://claude-code?event=other'`,
   `open -g 'sanduhr://claude-code?event=waiting&x=1'` and `open -g 'sanduhr://claude-code'`: no
   glow, no window, no error.
-- [ ] "Not while a terminal is in front" on: run the waiting command in Terminal (Terminal stays
+- [ ] "Not while the agent's app is in front" on: run the waiting command in Terminal (Terminal stays
   in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
 - [ ] Settings, Claude Code: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
   you, Not installed, and Install… works even where the page says Python is missing. Under the
@@ -745,7 +751,7 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   `jq '.hooks.Notification[0].hooks[0].command = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g '"'"'sanduhr://claude-code?event=waiting'"'"' || true"' ~/.claude-smoketest/settings.json > /tmp/st-old.json && mv /tmp/st-old.json ~/.claude-smoketest/settings.json`:
   the row reads Outdated. Install: Installed, and
   `grep -c 'sanduhr://' ~/.claude-smoketest/settings.json` prints 0.
-- [ ] With Claude Code: both switches on, "Not while a terminal is in front" on.
+- [ ] With Claude Code: both switches on, "Not while the agent's app is in front" on.
   `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` in a scratch folder, ask for something that needs
   a permission (`create a file x.txt`), and switch to Finder before it asks: the notch glows
   within a second of the prompt. Answer it; when the turn finishes with Finder in front, a
@@ -3084,3 +3090,162 @@ Launch with `CODEX_HOME=~/sanduhr-smoke/codex-home mac/Sanduhr.app/Contents/MacO
 Afterwards: quit the dev build; `rm -r ~/sanduhr-smoke/codex-home ~/sanduhr-smoke/agy-fixture`; remove `~/.gemini/antigravity-cli` only if you
 made it; restore `~/Library/Application Support/Sanduhr` from the backup (`rm -r` it, then copy `support-backup` back) and the preferences per
 section 45; relaunch `/Applications/Sanduhr.app`.
+
+## 81. Agent notifications (2.47.0)
+
+Use a dev build (signed out, file store) after the section 45 backup, with the debug hooks on (`smoke/smoke enable`), on made-up files and a scratch
+Claude Code folder: no step needs a real Codex or Antigravity install. Per CLAUDE.md, before testing quit `/Applications/Sanduhr.app` and copy
+`~/Library/Application Support/Sanduhr` to `~/sanduhr-smoke/support-backup`; never sign in or remove an account in the dev build. A banner posts a
+real macOS notification, so this walk leaves some in Notification Center: clear them at the end. `mac/smoke/README.md` has the `notify` action's
+syntax (`notify agent=<claude|codex|antigravity> kind=<started|finished|stopped|waiting|idle> [session= project= duration=]`, or `notify kind=post
+event=prompt|waiting|done`) and the `state.yaml` blocks the steps read: `agent_notifications` (the settings, `events` and `last`), `turn_cards`
+and `agent_watch`. Read them with `smoke/smoke state`; they hold a folder's name and a made-up title, never a path, so read them and don't paste them anywhere.
+`notify` runs the real rules (the source's own switch, the idle switch, the threshold, the surfaces' switches, quiet hours, the front app and the limiter),
+so a Claude Code turn needs the hook installed (step 2) and a Codex or Antigravity one needs its source on.
+
+Make the fixtures. Codex honors `CODEX_HOME` when the app's own environment has it, so launch the dev build's binary from a shell with it set
+(`open` would drop it) and the real `~/.codex` is never touched. The rollout holds one closed turn, so nothing is open at launch:
+
+```
+mkdir -p ~/sanduhr-smoke/codex-notify/sessions/2026/11/21
+python3 - <<'PY'
+import datetime as dt, json, os
+f = os.path.expanduser("~/sanduhr-smoke/codex-notify/sessions/2026/11/21/rollout-2026-11-21T10-00-00-notify1.jsonl")
+now = dt.datetime.now(dt.timezone.utc)
+ts = lambda m: (now - dt.timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%SZ")
+ev = lambda m, p: {"timestamp": ts(m), "type": "event_msg", "payload": p}
+lines = [{"timestamp": ts(30), "type": "session_meta", "payload": {"session_id": "notify1", "cwd": "/work/Projects/float-demo", "thread_source": "user"}},
+         {"timestamp": ts(29), "type": "turn_context", "payload": {"model": "gpt-demo", "cwd": "/work/Projects/float-demo"}},
+         ev(28, {"type": "task_started"}), ev(25, {"type": "task_complete", "duration_ms": 180000})]
+open(f, "w").write("\n".join(json.dumps(l) for l in lines) + "\n")
+PY
+```
+
+Growth helpers for the later steps (paste them into the shell that runs the smoke commands). `codex_event` appends one turn marker to that rollout;
+`agy_turn N` appends a prompt that began N seconds ago and a final-looking step now to the Antigravity transcript (fixture below):
+
+```
+codex_event() { python3 - "$@" <<'PY'
+import datetime as dt, glob, json, os, sys
+kind = sys.argv[1]; ms = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+f = glob.glob(os.path.expanduser("~/sanduhr-smoke/codex-notify/sessions/2026/11/21/rollout-2026-11-21T10-00-00-notify1.jsonl"))[0]
+p = {"type": kind}
+if kind == "task_complete": p["duration_ms"] = ms
+open(f, "a").write(json.dumps({"timestamp": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "type": "event_msg", "payload": p}) + "\n")
+PY
+}
+agy_turn() { python3 - "$@" <<'PY'
+import datetime as dt, json, os, sys
+secs = int(sys.argv[1]); now = dt.datetime.now(dt.timezone.utc)
+iso = lambda t: t.strftime("%Y-%m-%dT%H:%M:%SZ")
+f = os.path.expanduser("~/.gemini/antigravity-cli/brain/notify-conv/.system_generated/logs/transcript.jsonl")
+rows = [{"type": "USER_INPUT", "created_at": iso(now - dt.timedelta(seconds=secs)), "step_index": 0, "content": "never read"},
+        {"type": "PLANNER_RESPONSE", "created_at": iso(now), "step_index": 1, "status": "DONE", "content": "never read"}]
+open(f, "a").write("\n".join(json.dumps(r) for r in rows) + "\n")
+PY
+}
+```
+
+The Antigravity CLI has no override, so the app reads `~/.gemini/antigravity-cli`. Check that folder first (`ls ~/.gemini/antigravity-cli`): if it exists with
+real data, skip step 14 and do it later on that Mac. If it does not exist, make the fixture and remove it at the end (`rm -r ~/.gemini/antigravity-cli`, and
+`~/.gemini` too if you made it and it is empty):
+
+```
+D=~/.gemini/antigravity-cli; mkdir -p $D/brain/notify-conv/.system_generated/logs
+: > $D/brain/notify-conv/.system_generated/logs/transcript.jsonl
+python3 - <<'PY'
+import json, os, sqlite3
+d = os.path.expanduser("~/.gemini/antigravity-cli")
+db = sqlite3.connect(d + "/conversation_summaries.db")
+db.execute("CREATE TABLE conversation_summaries (conversation_id TEXT, title TEXT, preview TEXT, workspace_uris TEXT, raw_summary TEXT, last_modified_time TEXT)")
+db.execute("INSERT INTO conversation_summaries VALUES ('notify-conv', 'a title', 'a preview', ?, 'a summary', '2026-11-21')", (json.dumps(["file:///work/Projects/agy-demo"]),))
+db.commit(); db.close()
+PY
+```
+
+The scratch Claude Code folder is `~/.claude-smoketest` (section 22 makes it): `mkdir -p ~/.claude-smoketest/projects; echo '{}' > ~/.claude-smoketest/settings.json`
+if it is not there. Never use or edit a real `~/.claude*` folder. Launch with
+`CODEX_HOME=~/sanduhr-smoke/codex-notify mac/Sanduhr.app/Contents/MacOS/Sanduhr` (a dev build from `cd mac && ./build.sh --debug`, started with
+`SANDUHR_DEBUG_HOOKS=1` or after `smoke/smoke enable`). Take the idle CPU baseline (step 19) now, before anything below is switched on.
+
+1. **A Mac with only Claude is as 2.45.0.** Before touching anything (Codex and Antigravity off in Settings, Usage, Sources; no hook in any folder): Settings has a
+   **Notifications** page right after Alerts. It opens with "Know when an agent finishes a long turn or needs you…" and a row each for Claude Code
+   ("Working, finished and waiting"), Codex and Antigravity, the last two saying "Switch it on in Usage ▸ Sources", and Claude Code saying "Needs the
+   Claude Code hook. Install it on the Claude Code page." `smoke/smoke state` has `agent_watch: []` and `turn_cards: []`; the Desk, the widget and the glow are exactly as
+   2.45.0 (the Desk pulse and **Test Glow** still glow the notch in the notch ink). Settings search for `agent` or `turn` reaches Notifications.
+2. **Turn the sources and the hook on.** In Sources tick Codex and the Antigravity CLI (`sources.codex.on` and `sources.antigravity.on` read true in `state.yaml`). In Settings,
+   Claude Code, install the Claude Code glow hook into `~/.claude-smoketest`. The consent sheet says the hook reads the prompt and keeps only the folder and the session.
+   `jq '.hooks | keys' ~/.claude-smoketest/settings.json` lists `Notification`, `Stop` and `UserPromptSubmit`. The Notifications page now shows that folder "Installed" under
+   Claude Code and "On" for Codex and Antigravity, and `agent_watch` lists `codex home` and `antigravity cli` with `mode: fsevents`, and `signals` for Claude Code. In
+   Settings, Notifications switch **Not while the agent's app is in front** off for steps 3 to 6 and 8 to 14 (the terminal you run the smoke from counts as in front, which holds
+   every notification back; step 7 tests the rule). Leave the notification, the Desk card and the threshold (1 minute) as they are, and put the watchers piece on the Desk.
+3. **A long turn notifies.** `smoke/smoke do notify agent=codex kind=finished project=float-demo duration=124 session=s1`. `agent_notifications.last` reads `banner: true`,
+   `card: true`, `glow: false` (the glow is off), title `Codex finished`, body `float-demo, 2m 04s`; a macOS notification shows the same, and the Desk shows a
+   `Codex · float-demo` card reading finished. `turn_cards` has one entry, state `finished`. Click the notification: the widget comes forward and nothing else opens.
+4. **The threshold.** A 30-second `finished` (`duration=30`): `banner: false`, `card: true` (the card still updates). No duration at all (`notify agent=codex kind=finished
+   project=float-demo session=s2`): `banner: false`. Set the threshold to **Every turn** and send the same two: `banner: true` for both. Back to 1 minute. A `kind=started` never
+   raises a notification and puts a running card (`turn_cards` state `running`) on the Desk with its timer counting.
+5. **Waiting and the idle reminder.** `notify agent=claude kind=waiting project=float-demo session=c1`: `banner: true` at once, title `Claude Code is waiting on you`,
+   body `float-demo` (no duration), and a waiting card. `notify agent=claude kind=idle project=float-demo session=c1`: with the idle reminder off (its default)
+   `banner: false` and no new card; switch **Remind me when Claude Code has waited a minute…** on and send it again: `banner: true`, the same title, and still no card.
+   Switch the idle reminder back off.
+6. **The surfaces' switches.** With **Show a macOS notification** off, a long `finished` gives `banner: false` and `card: true`; with **Show a card on the Desk** off as well,
+   `card: false` and every agent's cards leave the Desk at once. Turn both back on.
+7. **In front.** Switch **Not while the agent's app is in front** on. Run a long `finished` from the terminal (it is in front): `banner: false`, `glow: false`, `card: true`. Bring
+   Finder forward and send it from a delayed command, `open -a Finder; sleep 3; smoke/smoke do notify agent=claude kind=waiting project=float-demo session=c2`: `banner: true`. A
+   terminal in front counts for every agent; the Codex app counts for Codex only: on a Mac with the Codex app, a Codex `finished` with it in front is held. Switch the setting back off.
+8. **The glow, and its color.** Switch **Glow when an agent finishes** and **Glow when an agent is waiting on you** on. They are the same switches as Settings, Notch, Glow:
+   changing one there changes it here, and both captions say so. A long Codex `finished`: `glow: true`, `glow_color: "#2FB5A3"` and the notch edge glows teal once; Antigravity's
+   is `#7B8CF0`, Claude Code's `#E0875A`. Change Codex's color under Sources and send it again: the glow follows. A `waiting` glows in the notch ink (`glow_color: null`),
+   whichever agent. A `stopped` takes the agent's color like `finished`. With no notch the glow is the top-center one, as before.
+9. **The limiter.** Send the same long `finished` (agent and session) twice within 20 seconds: the second has `banner: false` and `glow: false`; a different session is not held. A
+   `waiting` followed within 5 seconds by a `finished` for the same session: the `finished` is held. The holds in steps 7 and 10 use up no slot: a send held by quiet hours, then
+   sent again after they end, is not held by the limiter.
+10. **Quiet hours.** In Settings, Alerts, turn **Quiet hours** on with a window that covers now. A long `finished`: `banner: false`, `glow: false`, `card: true`. Turn Quiet hours
+    off. Alerts' own **Notifications** switch (off by default) and its delivery picker do not matter here: with it off and quiet hours off, the agent notification posts.
+11. **Try it.** Settings, Notifications, **Try it** beside the notification, the glow and the card: each shows a sample Claude Code turn ("your project") whatever its switch says (turn
+    each switch off and press it again), and none needs a source or the hook. The glow's sample takes Claude Code's color.
+12. **Permission.** In System Settings, Notifications, turn Sanduhr's notifications off: the page reads "macOS has notifications off for Sanduhr, so no notification will show. The glow
+    and the Desk card still work. Turn them on in System Settings." with **Open System Settings**; a long `finished` still moves the card and glows if the glow is on. Turn them back on:
+    the line goes. A Mac that has never been asked (Sanduhr's entry removed under System Settings, Notifications, or a fresh user) shows "Sanduhr hasn't asked macOS to show
+    notifications yet." and **Allow Notifications**, which asks; so does switching the notification on, and so does Try it.
+13. **Codex files.** With the dev build running, from an app that is not in front (`open -a Finder`, then run each helper after a `sleep 5;`), grow the rollout: `codex_event task_started`:
+    within a second `turn_cards` has a `running` card `float-demo` and no notification. Wait over a minute, then `codex_event task_complete 125000`: a notification `Codex finished`,
+    `float-demo, 2m 05s`, and the card turns finished. `codex_event task_started` and, after a minute, `codex_event turn_aborted`: a `Codex stopped` notification. A second rollout in the
+    same folder whose `session_meta` has `"forked_from_id": "notify1"` notifies nobody however it grows (a sub-agent). Quit and relaunch the dev build with a `task_started` as the last
+    line: nothing notifies at launch, and a following `codex_event task_complete 125000` does. Switch Codex off in Sources: `agent_watch` drops its entry and a growing rollout raises nothing.
+14. **The Antigravity CLI.** `agy_turn 130` appends a prompt that began 130 seconds ago and a final-looking step now. About 90 seconds later (not at once) a notification
+    `Antigravity finished`, `agy-demo, 2m 10s`, and the card finishes; until then the card reads running. Appending another line (`agy_turn 5`) within those 90 seconds cancels the
+    pending end, since more work arrived. There is never a "stopped" or a "waiting" for it. No notification, card or `state.yaml` field holds the words `never read`, `a title` or
+    `a preview`: only the folder's name, `agy-demo`.
+15. **A real Claude Code turn, for design section 9 check 1 (decision D2).** Scratch folder only, with the updated hook installed there and nowhere else. First prove the stdin: add a
+    throwaway hook beside Sanduhr's in `~/.claude-smoketest/settings.json` for each of `UserPromptSubmit`, `Notification` and `Stop`,
+    `{"type":"command","command":"cat > ~/sanduhr-smoke/stdin-<event>.json"}` (`<event>` the event's name). Then `mkdir -p ~/sanduhr-smoke/scratch-project && cd ~/sanduhr-smoke/scratch-project &&
+    CLAUDE_CONFIG_DIR=~/.claude-smoketest claude`, ask `create a file x.txt` and answer the permission when it asks. `jq 'keys' ~/sanduhr-smoke/stdin-*.json` lists `cwd` and `session_id` for
+    the prompt, the permission notification and the stop. If `cwd` is missing, the project is dropped from the notification body (the design's fallback) and the project in the lines
+    below reads empty. Then, with Finder in front during the permission ask: a `Claude Code is waiting on you` notification naming `scratch-project` and a waiting card; when the turn ends, `Claude Code
+    finished` with the project and the duration if it ran over the threshold (make it a long one). The prompt's text is in no notification, card or `state.yaml` field. While a turn runs,
+    `ls ~/Library/Application\ Support/Sanduhr/cc-signal-* 2>/dev/null` shows no file for long: each is deleted as it is read. Claude Code never waits on the hook (the prompt does not
+    stall; the hook costs about 50 ms) and shows no hook error.
+16. **Older hooks and a bare post.** Put 2.46's command back for `Notification`: `jq '.hooks.Notification[0].hooks[0].command = "/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true"'
+    ~/.claude-smoketest/settings.json > /tmp/st-246.json && mv /tmp/st-246.json ~/.claude-smoketest/settings.json`: the Claude Code row on Notifications and on the Claude Code page reads
+    **Outdated** and offers Update, and "The Claude Code hook here is an older one…" shows. With the glow switches on, `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` glows the
+    notch once in the notch ink and raises no notification and no card; `smoke/smoke do notify kind=post event=waiting` does the same without a Darwin name. Drop a made-up signal file first and
+    the post goes down the new path instead (no legacy glow): `printf '{"v":1,"event":"waiting","cwd":"/work/Projects/float-demo","session":"p1","at":%s}'
+    "$(python3 -c 'import time;print(int(time.time()*1000))')" > ~/Library/Application\ Support/Sanduhr/cc-signal-$(date +%s)000-smoke.json`, then `smoke/smoke do notify kind=post event=waiting`: the
+    file is gone and `last` shows a waiting decision for `float-demo`. A file over 4 KB, one that is not JSON and one whose `at` is ten minutes old are deleted and raise nothing. Update restores the
+    hook, and `grep -c osascript ~/.claude-smoketest/settings.json` prints 3.
+17. **The change for people with the glow on.** Quit the dev build, then `defaults write com.626labs.sanduhr.desk notchGlowClaudeWaiting -bool true; defaults delete com.626labs.sanduhr
+    agentNotifications.migrated; defaults delete com.626labs.sanduhr agentNotifications.idle` (the dev build shares the release app's domains, which section 45 backed up). Relaunch: the idle
+    reminder is on and `agentNotifications.migrated` is set; a second relaunch changes nothing, even after you switch the reminder off. With a 1-minute threshold and the glow on, a 30-second `finished`
+    from the updated hook raises no glow, and **Every turn** raises it. The glow's three switches are as they were before the upgrade.
+18. **Demo mode, and Sanduhr quit.** Demo mode on: nothing is followed (`agent_watch: []`), the `notify` action's turns raise nothing and no turn card is on the Desk. Demo off. With Sanduhr quit,
+    finish a Claude Code turn in the scratch folder: Sanduhr does not start, and no `cc-signal-*` or `watch-stop-*` file appears in `~/Library/Application Support/Sanduhr`.
+19. **Idle CPU with Codex and Antigravity on.** Take `ps -o cputime= -p <pid>` at the start and ten minutes later, with everything idle: once before step 2 (the baseline, nothing followed) and again with
+    the hook installed, Codex and Antigravity on, the fixtures idle and the watchers piece placed. The second delta is under 1 percent of the 600 seconds (under 6 CPU seconds), cputime deltas and
+    never `ps %cpu`. Repeat after `agy_turn 5` has armed and its 90-second wait has run out (the 5-second ticker stops once it fires).
+
+Afterwards: quit the dev build; clear Sanduhr's notifications in Notification Center; `rm -r ~/sanduhr-smoke/codex-notify ~/sanduhr-smoke/scratch-project; rm -f ~/sanduhr-smoke/stdin-*.json`; remove
+`~/.gemini/antigravity-cli` only if you made it; take the throwaway hooks out of `~/.claude-smoketest/settings.json` (or Remove the glow hook there); restore
+`~/Library/Application Support/Sanduhr` from the backup (`rm -r` it, then copy `support-backup` back) and the preferences per section 45 (this puts back the glow switches step 17 wrote); relaunch
+`/Applications/Sanduhr.app`.
