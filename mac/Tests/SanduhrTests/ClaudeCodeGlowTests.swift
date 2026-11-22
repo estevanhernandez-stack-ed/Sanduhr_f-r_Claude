@@ -34,6 +34,8 @@ struct ClaudeCodeGlowTests {
             "sanduhr://claude-code?event=",
             "sanduhr://claude-code?event=WAITING",
             "sanduhr://claude-code?event=stop",
+            // 2.47's prompt event is a hook signal only: the link keeps 2.46's two events.
+            "sanduhr://claude-code?event=prompt",
             "sanduhr://claude-code?event=waiting&event=done",
             "sanduhr://claude-code?event=waiting&prompt=hello",
             "sanduhr://claude-code?kind=waiting",
@@ -61,6 +63,8 @@ struct ClaudeCodeGlowTests {
     @Test func theNotificationNames() {
         #expect(ClaudeCodeSignal.name(.waiting) == "com.626labs.sanduhr.claude-code.waiting")
         #expect(ClaudeCodeSignal.name(.done) == "com.626labs.sanduhr.claude-code.done")
+        #expect(ClaudeCodeSignal.name(.prompt) == "com.626labs.sanduhr.claude-code.prompt")
+        #expect(ClaudeCodeEvent.allCases == [.prompt, .waiting, .done])
         for e in ClaudeCodeEvent.allCases { #expect(ClaudeCodeSignal.event(ClaudeCodeSignal.name(e)) == e) }
         for bad in ["com.626labs.sanduhr.claude-code.", "com.626labs.sanduhr.claude-code.WAITING",
                     "com.626labs.sanduhr.claude-code.stop", "com.example.claude-code.done", "done"] {
@@ -75,7 +79,7 @@ struct ClaudeCodeGlowTests {
         let prefix = "com.626labs.sanduhr.test.\(UUID().uuidString)."
         let box = Received()
         let signal = ClaudeCodeSignal(prefix: prefix, queue: DispatchQueue(label: "signal-test")) { box.add($0) }
-        #expect(signal.registered == 2)
+        #expect(signal.registered == 3)
         func post(_ event: ClaudeCodeEvent) throws {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/notifyutil")
@@ -92,12 +96,14 @@ struct ClaudeCodeGlowTests {
         wait(for: 1)
         try post(.done)
         wait(for: 2)
-        #expect(box.events == [.waiting, .done])
+        try post(.prompt)
+        wait(for: 3)
+        #expect(box.events == [.waiting, .done, .prompt])
         signal.cancel()
         #expect(signal.registered == 0)
         try post(.done)
         Thread.sleep(forTimeInterval: 0.2)
-        #expect(box.events == [.waiting, .done])
+        #expect(box.events == [.waiting, .done, .prompt])
     }
 
     private final class Received: @unchecked Sendable {
@@ -209,6 +215,20 @@ struct ClaudeCodeGlowTests {
         #expect(NotchGlowEvent.Kind(rawValue: "claude-done") == .claudeDone)
         #expect(ClaudeCodeEvent.waiting.kind == .claudeWaiting)
         #expect(ClaudeCodeEvent.done.kind == .claudeDone)
+        #expect(ClaudeCodeEvent.prompt.kind == nil)
+    }
+
+    /// A prompt never glows, whatever the switches, and uses up no limiter slot: waiting and
+    /// done glow exactly as in 2.46 around it.
+    @Test func aPromptNeverGlows() {
+        let all = NotchGlowSwitches(claudeWaiting: true, claudeDone: true)
+        var l = ClaudeCodeGlowLimiter()
+        #expect(!ClaudeCodeGlowRules.decide(.prompt, switches: all, frontmost: nil, limiter: &l, now: at(0)))
+        #expect(l == ClaudeCodeGlowLimiter())
+        #expect(ClaudeCodeGlowRules.decide(.done, switches: all, frontmost: nil, limiter: &l, now: at(1)))
+        #expect(ClaudeCodeGlowRules.decide(.waiting, switches: all, frontmost: nil, limiter: &l, now: at(2)))
+        #expect(!ClaudeCodeGlowRules.decide(.prompt, switches: all, frontmost: nil, limiter: &l, now: at(30)))
+        #expect(!ClaudeCodeGlowRules.decide(.done, switches: all, frontmost: nil, limiter: &l, now: at(5)))
     }
 
     // MARK: Where it glows

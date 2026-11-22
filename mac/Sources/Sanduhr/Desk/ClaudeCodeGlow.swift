@@ -1,17 +1,21 @@
 import Foundation
 import notify
 
-/// What Claude Code tells Sanduhr through its hooks (item 51): only that a session waits on you
-/// or finished a turn. Nothing about the conversation ever comes with it.
+/// What Claude Code tells Sanduhr through its hooks (item 51): that a prompt was sent (2.47), a
+/// session waits on you, or it finished a turn. Nothing about the conversation ever comes with it;
+/// the 2.47 hook's signal file adds only the folder and the session id (AgentTurns).
 enum ClaudeCodeEvent: String, CaseIterable, Sendable {
+    /// `UserPromptSubmit` (2.47): a turn started. It times the turn and never glows.
+    case prompt
     /// `Notification`: a permission prompt, an input request, or the idle reminder.
     case waiting
     /// `Stop`: a turn finished.
     case done
 
-    /// The Glow switch that governs it.
-    var kind: NotchGlowEvent.Kind {
+    /// The Glow switch that governs it; nil for a prompt, which never glows.
+    var kind: NotchGlowEvent.Kind? {
         switch self {
+        case .prompt: nil
         case .waiting: .claudeWaiting
         case .done: .claudeDone
         }
@@ -43,12 +47,14 @@ enum ClaudeCodeLink {
               let c = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let items = c.queryItems, items.count == 1, items[0].name == "event",
               let value = items[0].value else { return nil }
-        return ClaudeCodeEvent(rawValue: value)
+        // The prompt event is a hook signal only: the link keeps 2.46's two events.
+        guard let event = ClaudeCodeEvent(rawValue: value), event != .prompt else { return nil }
+        return event
     }
 }
 
 /// The Darwin notifications the installed hooks post (`/usr/bin/notifyutil -p <name>`):
-/// `com.626labs.sanduhr.claude-code.waiting` and `….done`. Unlike opening `sanduhr://`, a post
+/// `com.626labs.sanduhr.claude-code.prompt` (2.47), `….waiting` and `….done`. Unlike opening `sanduhr://`, a post
 /// never launches anything: it reaches whichever Sanduhr is running (a dev build too), and
 /// nothing when none is. The name is the whole message; a notification carries no data.
 final class ClaudeCodeSignal: @unchecked Sendable {
@@ -68,7 +74,7 @@ final class ClaudeCodeSignal: @unchecked Sendable {
     private let lock = NSLock()
     private var tokens: [Int32] = []
 
-    /// Registers for both names; `handler` runs on `queue` once per post. Tests pass their own
+    /// Registers for the three names; `handler` runs on `queue` once per post. Tests pass their own
     /// prefix so a real Sanduhr on the same Mac never hears them.
     init(prefix: String = ClaudeCodeSignal.prefix, queue: DispatchQueue = .main,
          handler: @escaping @Sendable (ClaudeCodeEvent) -> Void) {
@@ -81,7 +87,7 @@ final class ClaudeCodeSignal: @unchecked Sendable {
         }
     }
 
-    /// How many names are registered (2 when both took).
+    /// How many names are registered (3 when all took).
     var registered: Int { lock.withLock { tokens.count } }
 
     func cancel() {
@@ -140,7 +146,7 @@ enum ClaudeCodeGlowRules {
     /// on), and the limiter lets it through. Only a glow that happens is remembered.
     static func decide(_ event: ClaudeCodeEvent, switches: NotchGlowSwitches, frontmost: String?,
                        limiter: inout ClaudeCodeGlowLimiter, now: Date) -> Bool {
-        guard switches.isOn(event.kind) else { return false }
+        guard let kind = event.kind, switches.isOn(kind) else { return false }
         if switches.claudeSkipTerminal, isTerminal(frontmost) { return false }
         return limiter.allow(event, now: now)
     }

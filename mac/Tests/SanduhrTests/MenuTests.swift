@@ -149,7 +149,7 @@ struct SettingsSidebarTests {
         // Item 36: Accounts replaced Credentials; the raw value stays for links and smoke.
         #expect(SettingsSection(rawValue: "credentials") == .credentials)
         #expect(SettingsSection.credentials.title == "Accounts")
-        #expect(SettingsSection.groups.first?.sections == [.general, .credentials, .usage, .alerts])
+        #expect(SettingsSection.groups.first?.sections == [.general, .credentials, .usage, .alerts, .notifications])
         // Settings v2, slice 2: Integrations is Claude Code and Mods is Mods & Config, under their
         // own group; the raw values stay.
         #expect(SettingsSection(rawValue: "integrations")?.title == "Claude Code")

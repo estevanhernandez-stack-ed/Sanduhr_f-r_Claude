@@ -309,3 +309,16 @@ menu_bar_display:
   tooltip: null
 footer: "Updated 4:10 PM · Float"
 vault_agents: []
+agent_notifications:
+  banner: true
+  card: true
+  glow_finished: false
+  glow_waiting: false
+  skip_in_front: true
+  idle: false
+  threshold: 60
+  quiet_hours: false
+  events: 0
+  last: null
+turn_cards: []
+agent_watch: []

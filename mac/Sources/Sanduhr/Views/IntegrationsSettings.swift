@@ -181,6 +181,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        if kind == .hooks { NotificationCenter.default.post(name: .sanduhrHooksDidChange, object: nil) }
         switch outcome {
         case .success(.installed):
             // The band takes Sanduhr's segment looks from Combine; Replace clears them (item 65f).
@@ -285,6 +286,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        if kind == .hooks { NotificationCenter.default.post(name: .sanduhrHooksDidChange, object: nil) }
         noteFolder = folder
         note = failure.map { (message($0), true) }
             ?? ("\(kind.title) removed from \(display(folder)).", false)
@@ -761,9 +763,7 @@ private struct IntegrationConsentSheet: View {
     /// What Install writes, where.
     private var writes: String {
         let file = model.configDisplay(consent.kind, folder: consent.folder)
-        if consent.kind == .hooks {
-            return "Sanduhr adds one entry to each of \(consent.kind.keyPath) in \(file), keeping every hook already there, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only those two entries."
-        }
+        if consent.kind == .hooks { return HooksConsentCopy.writes(file: file) }
         if offersCombine {
             return "Either way Sanduhr sets \(consent.kind.keyPath) in \(file), keeping your line's padding, refresh interval and vim setting, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove puts your statusline back exactly as it is now."
         }
@@ -802,20 +802,37 @@ struct OtherCommandBox: View {
     }
 }
 
-/// What the notch glow hooks tell Sanduhr (item 51), and where the glow is switched on.
+/// The Claude Code hook's Install question (2.47): what it tells Sanduhr, and exactly what it reads
+/// and keeps. Pinned by IntegrationHooksTests.
+enum HooksConsentCopy {
+    static func lead(_ folder: String) -> String {
+        "Claude Code sessions using \(folder) tell Sanduhr when you send a prompt, when they wait on you (a permission prompt or a question) and when a turn finishes, so Sanduhr can time the turn, notify you and glow the notch."
+    }
+
+    static let keeps = "The hook reads what Claude Code hands it, which includes your prompt, and keeps only the session's folder and its session id. It writes those two to a small file in Sanduhr's folder, which Sanduhr deletes as it reads it, and nothing else. Nothing leaves this Mac, and while Sanduhr isn't running the hook writes nothing."
+
+    static let background = "Only with Watchers, Show Claude Code's background work on: when a turn finishes, the hook also hands Sanduhr the session's background tasks (each one's kind, status and short description, and the Claude Code folder), never a command. Sanduhr reads that and deletes it at once."
+
+    /// What Install writes, where.
+    static func writes(file: String) -> String {
+        "Sanduhr adds one entry to each of \(IntegrationKind.hooks.keyPath) in \(file), keeping every hook already there, and keeps a copy of the file as it was, with .sanduhr-backup added to its name. Remove takes out only those three entries."
+    }
+}
+
+/// What the Claude Code hook tells Sanduhr (item 51, 2.47), and where the glow is switched on.
 private struct HooksConsentBody: View {
     let folder: String
     let closeSheet: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Claude Code sessions using \(folder) tell Sanduhr when they wait on you (a permission prompt or a question) and when a turn finishes, so the notch can glow.")
+            Text(HooksConsentCopy.lead(folder))
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Claude Code tells Sanduhr only that it is waiting or finished, with a system notification whose name is that one word. Nothing about the conversation or the project is sent, and nothing leaves this Mac. The hook never starts Sanduhr: while it isn't running, it does nothing.")
+            Text(HooksConsentCopy.keeps)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Text("Only with Watchers, Show Claude Code's background work on: when a turn finishes, the hook also hands Sanduhr the session's background tasks (each one's kind, status and short description, and the Claude Code folder), never a command. Sanduhr reads that and deletes it at once.")
+            Text(HooksConsentCopy.background)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

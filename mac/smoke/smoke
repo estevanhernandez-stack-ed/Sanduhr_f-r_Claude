@@ -30,6 +30,9 @@ module Smoke
                             whats-new, close-whats-new (the What's New window),
                             tour, tour-step <n>, close-tour (the welcome tour),
                             watch-test start|wait|pass|fail|clear (a made-up watcher)
+                            notify agent=<a> kind=<k> [session= project= duration=] or kind=post
+                            event=prompt|waiting|done (a made-up agent turn through the real
+                            notification rules; a Claude Code post routed without a Darwin name)
                             av-test camera on|off, av-test mic on|off (fake the camera or mic signal)
                             message-editor add|revert (Settings, Message: the smoke's own line,
                             unsaved; revert drops unsaved edits; never saves)

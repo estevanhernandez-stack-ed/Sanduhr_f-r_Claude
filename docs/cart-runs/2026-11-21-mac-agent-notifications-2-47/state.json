@@ -1,0 +1,178 @@
+{
+  "run": "mac-agent-notifications-2-47",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "dde2e1112a16013ac41483a46b903caf37840c53",
+  "integration_branch": "cart/mac-agent-notifications-2-47",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-mac-agent-notifications-2-47/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-mac-agent-notifications-2-47",
+  "builder_branch": "main",
+  "uncommitted_at_start": [
+    "docs/superpowers/plans/2026-11-21-mac-agent-notifications.md",
+    "docs/superpowers/specs/2026-11-21-mac-agent-notifications-design.md"
+  ],
+  "started_at": "2026-11-22T01:45:30.516Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "turns-rules",
+      "title": "turns-rules",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--01-turns-rules",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "turn-readers",
+      "title": "turn-readers",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--02-turn-readers",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "activity-watcher",
+      "title": "activity-watcher",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--03-activity-watcher",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "claude-code-hook",
+      "title": "claude-code-hook",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--04-claude-code-hook",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "surfaces",
+      "title": "surfaces",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--05-surfaces",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "wiring",
+      "title": "wiring",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--06-wiring",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 7,
+      "slug": "settings-notifications",
+      "title": "settings-notifications",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--07-settings-notifications",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 8,
+      "slug": "smoke-hooks-idle-cpu",
+      "title": "smoke-hooks-idle-cpu",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--08-smoke-hooks-idle-cpu",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 9,
+      "slug": "rows-2-47",
+      "title": "rows-2-47",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-agent-notifications-2-47--09-rows-2-47",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}

@@ -149,6 +149,7 @@ enum DebugHooks {
             app.applySetupForSmoke(desktop: desktop, usage: usage, codex: codex)
         case .sources:
             break    // handled in handle(), where a refusal can become the error
+        case .notify(let step): app.notifyForSmoke(step)
         case .drawers(let step):
             // Only against a stand-in Desktop: without the override a smoke run would sort, or
             // put back, the real Desktop's files.
@@ -465,6 +466,9 @@ enum DebugHooks {
         s.sources = SourcesDebug.of(setup: sourceSetup, settings: AgentSourceSettings.load(),
                                     consent: MCPAgentConsent.load())
         s.codex = CodexDebug.of(app.codexUsage)
+        s.agentNotifications = app.agentNotificationsDebug()
+        s.turnCards = TurnCardDebug.rows(WatcherStore.shared.board.watchers, now: Date())
+        s.agentWatch = app.agentWatchDebug()
         s.widgetSources = WidgetSourcesDebug.of(app.widgetSourceLayout())
         let display = app.menuBarDisplay()
         s.menuBarDisplay = MenuBarDisplayDebug(text: display.reading?.text, tooltip: display.tooltip)

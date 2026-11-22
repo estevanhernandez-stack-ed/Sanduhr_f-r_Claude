@@ -117,14 +117,73 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func post(id: String, title: String, body: String, sound: String) {
+        post(.alert(id: id, title: title, body: body, sound: sound))
+    }
+
+    private func post(_ spec: BannerSpec) {
         let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        // A named system sound is played with NSSound (playSystemSound): UNNotificationSound(named:)
-        // only looks in the app's own bundle and Library/Sounds, not /System/Library/Sounds.
-        content.sound = sound == AlertSound.standard ? .default : nil
+        content.title = spec.title
+        content.body = spec.body
+        if let thread = spec.thread { content.threadIdentifier = thread }
+        content.sound = spec.defaultSound ? .default : nil
         UNUserNotificationCenter.current().add(
-            UNNotificationRequest(identifier: id, content: content, trigger: nil))
+            UNNotificationRequest(identifier: spec.id, content: content, trigger: nil))
+    }
+
+    /// What one banner carries, before it becomes a notification request. Pure, so the words, the thread and
+    /// the sound are tested without Notification Center.
+    struct BannerSpec: Equatable {
+        var id: String
+        var title: String
+        var body: String
+        var thread: String?
+        /// The default notification sound. A named system sound is played with NSSound instead
+        /// (playSystemSound): UNNotificationSound(named:) only looks in the app's own bundle and
+        /// Library/Sounds, not /System/Library/Sounds.
+        var defaultSound: Bool
+
+        /// A limit alert's banner, as it has always been: no thread.
+        static func alert(id: String, title: String, body: String, sound: String) -> BannerSpec {
+            BannerSpec(id: id, title: title, body: body, thread: nil, defaultSound: sound == AlertSound.standard)
+        }
+
+        /// An agent's banner: its own thread, and the alert sound setting.
+        static func agent(_ b: AgentBanner, sound: String) -> BannerSpec {
+            BannerSpec(id: b.id, title: b.title, body: b.body, thread: b.thread, defaultSound: sound == AlertSound.standard)
+        }
+    }
+
+    // MARK: - Agent notifications (2.47.0)
+
+    /// An agent's turn ended or waits on you (AgentNotifier decided it may interrupt). Its own path beside
+    /// `deliver`: Alerts' master switch and delivery route don't apply, the alert sound does. A session's newer
+    /// banner replaces its older one (the identifier). If macOS notification permission is off, Notification
+    /// Center drops it; nothing retries.
+    func postAgent(_ banner: AgentBanner) {
+        let sound = AlertSettings(defaults).sound
+        post(.agent(banner, sound: sound))
+        playSystemSound(sound)
+    }
+
+    /// Shows the widget: a click on an agent notification. AppDelegate's showPanel by default; injectable.
+    var showWidget: @MainActor () -> Void = { (NSApp.delegate as? AppDelegate)?.showPanel() }
+
+    /// What a click on a notification opens.
+    enum ClickTarget: Equatable {
+        case settings(SettingsSection)
+        case widget
+    }
+
+    /// The click for a notification's identifier, by its prefix; nil for one a click does nothing for (a limit
+    /// alert).
+    static func clickTarget(for id: String) -> ClickTarget? {
+        if id.hasPrefix(AgentBanner.idPrefix) { return .widget }
+        let section: SettingsSection? = id.hasPrefix(deskSuggestionPrefix) ? .message
+            : id.hasPrefix(themeSuggestionPrefix) ? .themes
+            : id.hasPrefix(widgetSuggestionPrefix) || id.hasPrefix(spriteMotionPrefix) ? .widgets
+            : id.hasPrefix(deskDesignSuggestionPrefix) ? .deskLayout
+            : id.hasPrefix(ExpiredAccountNotice.idPrefix) ? .credentials : nil
+        return section.map(ClickTarget.settings)
     }
 
     /// Once per delivery, not per banner, and only while Sanduhr's notification sounds are on
@@ -272,14 +331,14 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
-        let id = response.notification.request.identifier
-        let section: SettingsSection? = id.hasPrefix(Self.deskSuggestionPrefix) ? .message
-            : id.hasPrefix(Self.themeSuggestionPrefix) ? .themes
-            : id.hasPrefix(Self.widgetSuggestionPrefix) || id.hasPrefix(Self.spriteMotionPrefix) ? .widgets
-            : id.hasPrefix(Self.deskDesignSuggestionPrefix) ? .deskLayout
-            : id.hasPrefix(ExpiredAccountNotice.idPrefix) ? .credentials : nil
-        if let section {
+        switch Self.clickTarget(for: response.notification.request.identifier) {
+        case .settings(let section):
             DispatchQueue.main.async { MainActor.assumeIsolated { SettingsWindowController.shared.show(section) } }
+        case .widget:
+            let show = showWidget
+            DispatchQueue.main.async { MainActor.assumeIsolated { show() } }
+        case nil:
+            break
         }
         completionHandler()
     }

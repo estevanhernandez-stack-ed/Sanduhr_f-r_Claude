@@ -80,6 +80,11 @@ struct DebugStateInput {
     var menuBarDisplay = MenuBarDisplayDebug()
     var footer = ""
     var vaultAgents: [VaultAgentDebug] = []
+    /// Agent notifications (2.47.0): the settings the rules read and the last decision, the agent turn cards on
+    /// the Desk, and what the activity watcher follows. Flags, counts, names and times only, never a path.
+    var agentNotifications = AgentNotificationsDebug()
+    var turnCards: [TurnCardDebug] = []
+    var agentWatch: [AgentWatchDebug] = []
     /// The last `reset --dry-run` (Settings v2, slice 5): the plan in run order, kinds and counts
     /// only, never a path, a folder, a label or a domain's contents. Nil until one ran.
     var resetDryRun: Reset.Report?
@@ -742,6 +747,9 @@ enum DebugState {
         pairs.append(("menu_bar_display", menuBarDisplayYAML(s.menuBarDisplay)))
         pairs.append(("footer", .string(s.footer)))
         pairs.append(("vault_agents", vaultAgentsYAML(s.vaultAgents)))
+        pairs.append(("agent_notifications", agentNotificationsYAML(s.agentNotifications)))
+        pairs.append(("turn_cards", turnCardsYAML(s.turnCards)))
+        pairs.append(("agent_watch", agentWatchYAML(s.agentWatch)))
         return .object(pairs)
     }
     

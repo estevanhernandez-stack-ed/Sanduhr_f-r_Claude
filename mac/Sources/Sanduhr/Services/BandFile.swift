@@ -36,6 +36,9 @@ enum BandFile {
         case .runner:
             // State and kind only: a runner's name can name a private repo.
             return ["source": "automatic", "kind": "runner", "state": w.state.rawValue]
+        case .turn:
+            // Never written (`carried` leaves turn cards out); state and kind only if one were.
+            return ["source": "automatic", "kind": "turn", "state": w.state.rawValue]
         case .agent:
             var o: [String: Any] = ["source": "agent", "title": w.title, "state": w.state.rawValue,
                                     "started_at": HandoffFiles.stamp(w.started)]
@@ -48,6 +51,10 @@ enum BandFile {
             return o
         }
     }
+
+    /// The watchers the band carries: every card but an agent's turn card, which belongs to the Desk (the band
+    /// sits in Claude Code itself, where the turn is already in front of you).
+    static func carried(_ watchers: [Watcher]) -> [Watcher] { watchers.filter { $0.source != .turn } }
 
     /// The file's object without `written_at`: what decides whether a write is due.
     static func body(watchers: [Watcher]?, styles: [SanduhrSegment: SegmentStyle], reduceMotion: Bool) -> [String: Any] {
@@ -98,7 +105,7 @@ enum BandFile {
 @MainActor
 final class BandFileWriter {
     static let shared = BandFileWriter(watchers: {
-        WatcherBoard.shown(WatcherStore.shared.ordered, demo: DeskController.shared.model.demo)
+        BandFile.carried(WatcherBoard.shown(WatcherStore.shared.ordered, demo: DeskController.shared.model.demo))
     })
 
     let url: URL

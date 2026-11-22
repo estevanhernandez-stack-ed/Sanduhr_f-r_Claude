@@ -126,6 +126,18 @@ final class WatcherStore {
         changed()
     }
 
+    /// An agent's turn moved (AgentNotifier's card surface): its turn card follows. No switch here gates it:
+    /// AgentNotifier already checked the Notifications page's card switch, and the card shows only where the
+    /// watchers piece is placed.
+    func applyTurn(_ e: AgentTurnEvent) {
+        if board.applyTurn(e, now: now()) { changed() }
+    }
+
+    /// An agent was switched off: its turn cards go (there is no event for it, decision D6).
+    func clear(agent: AgentSource) {
+        if board.clearTurns(agent) { changed() }
+    }
+
     func dismissAll() {
         board.dismissAll()
         changed()
