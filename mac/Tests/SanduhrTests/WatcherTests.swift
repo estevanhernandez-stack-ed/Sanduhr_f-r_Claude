@@ -244,7 +244,9 @@ struct WatcherTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        p.arguments = ["-l", "JavaScript", "-e", IntegrationInstaller.stopTasksScript, dir.path]
+        // 2.47: the one hook script writes this report on done, with the background switch on.
+        try WatcherStore.switchesJSON(agents: false, background: true).write(to: dir.appendingPathComponent(WatcherStore.switchFile))
+        p.arguments = ["-l", "JavaScript", "-e", IntegrationInstaller.signalScript, dir.path, "done"]
         p.environment = ["CLAUDE_CONFIG_DIR": "/Users/someone/.claude-work", "PATH": "/usr/bin:/bin"]
         let input = Pipe()
         p.standardInput = input
@@ -255,10 +257,10 @@ struct WatcherTests {
         try input.fileHandleForWriting.close()
         p.waitUntilExit()
         #expect(p.terminationStatus == 0)
-        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix(WatcherStore.stopPrefix) }
         #expect(names.count == 1)
         let name = try #require(names.first)
-        #expect(name.hasPrefix(WatcherStore.stopPrefix) && name.hasSuffix(".json"))
+        #expect(name.hasSuffix(".json"))
         let path = dir.appendingPathComponent(name).path
         let mode = (try FileManager.default.attributesOfItem(atPath: path)[.posixPermissions] as? NSNumber)?.intValue
         #expect(mode == 0o600)

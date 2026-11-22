@@ -14,7 +14,7 @@ import Foundation
 ///     { "schema_version": 1, "op": "end", "id": "…", "requested_at": "…", "result": "passed" }
 ///
 /// A Stop's report, `watch-stop-<ms>-<uuid>.json`, written by the installed Stop hook
-/// (IntegrationInstaller.stopTasksScript) when "Show Claude Code's background work" is on:
+/// (IntegrationInstaller.signalScript, on done) when "Show Claude Code's background work" is on:
 ///
 ///     { "schema_version": 1, "session": "…", "folder": "/Users/x/.claude-work",
 ///       "tasks": [ { "id": "…", "type": "shell", "status": "running",

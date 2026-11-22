@@ -8,8 +8,9 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
     case statusline
     /// The meters mod's folder in `env.CLAUDE_CODE_PLUGIN_DIRS` of the folder's `settings.json`.
     case meters
-    /// Sanduhr's entries in `hooks.Notification` and `hooks.Stop` of the folder's
-    /// `settings.json`: Claude Code posts `com.626labs.sanduhr.claude-code.…` and the notch glows.
+    /// Sanduhr's entries in `hooks.UserPromptSubmit`, `hooks.Notification` and `hooks.Stop` of the
+    /// folder's `settings.json`: Claude Code writes a signal file and posts
+    /// `com.626labs.sanduhr.claude-code.…`.
     case hooks
 
     var title: String {
@@ -27,7 +28,7 @@ enum IntegrationKind: String, Codable, CaseIterable, Sendable {
         case .mcp: "mcpServers.sanduhr"
         case .statusline: "statusLine"
         case .meters: "env.CLAUDE_CODE_PLUGIN_DIRS"
-        case .hooks: "hooks.Notification and hooks.Stop"
+        case .hooks: "hooks.UserPromptSubmit, hooks.Notification and hooks.Stop"
         }
     }
 
@@ -180,7 +181,11 @@ struct IntegrationInstaller {
 
     static let hooksKey = "hooks"
     /// The hook events Sanduhr adds an entry to, and the event each one reports.
-    static let hookEvents: [(name: String, event: ClaudeCodeEvent)] = [("Notification", .waiting), ("Stop", .done)]
+    static let hookEvents: [(name: String, event: ClaudeCodeEvent)] = [
+        ("UserPromptSubmit", .prompt), ("Notification", .waiting), ("Stop", .done),
+    ]
+    /// The hook stops writing signal files once this many wait unread (a Sanduhr that stopped reading).
+    static let signalFileCap = 100
     /// The notifications that mean "waiting on you": a permission prompt, the idle reminder, a
     /// question from an MCP server. Not a sign-in notice or the others.
     static let waitingMatcher = "permission_prompt|idle_prompt|elicitation_dialog"
@@ -260,49 +265,68 @@ struct IntegrationInstaller {
 
     // MARK: The hooks (item 51)
 
-    /// The command a hook runs: post Sanduhr's Darwin notification (ClaudeCodeSignal), and always
-    /// exit 0 so Claude Code never reports a hook error. A post never launches anything: it
-    /// reaches whichever Sanduhr is running, and nothing when none is. (Hooks before this opened
-    /// `sanduhr://claude-code?event=…`, which LaunchServices hands to the registered app and
-    /// launches it when it isn't running; isOurHookCommand still knows them, so they show as
-    /// outdated and Install rewrites them in place.)
+    /// The command a hook runs (2.47): while a Sanduhr runs (`pgrep`, so no file waits for a later
+    /// launch), `signalScript` reads the hook's input once and drops a small signal file into
+    /// Sanduhr's folder, plus item 66's background report on a Stop; then the command posts
+    /// Sanduhr's Darwin notification (ClaudeCodeSignal), after the file's rename, so a post from
+    /// this hook always finds its file. It always exits 0 so Claude Code never reports a hook
+    /// error, and a post never launches anything: it reaches whichever Sanduhr is running, and
+    /// nothing when none is.
     ///
-    /// The Stop hook also hands Sanduhr the session's background work (item 66), and only while
-    /// a Sanduhr runs to read it (`pgrep`, so no report waits for a later launch) and "Show Claude
-    /// Code's background work" is on (watchers.json says `"background":true`; Sanduhr writes it):
-    /// `stopTasksScript` reads the hook's input and drops a small report into Sanduhr's folder,
-    /// which the app reads and deletes at once. The notification is posted either way, so the
-    /// glow behaves as before.
+    /// Every older generation is still recognized (isOurHookCommand), reads as outdated and is
+    /// rewritten in place by Install or taken out by Remove: item 51's `open -g
+    /// 'sanduhr://claude-code?event=…'` (which launched Sanduhr when it wasn't running), item 66's
+    /// Stop command that opened the link, and 2.46's bare post and Stop command, whose report was
+    /// gated on a shell `grep` of watchers.json (that check is in the script now: stdin reads once).
     static func hookCommand(_ event: ClaudeCodeEvent) -> String {
-        let post = "/usr/bin/notifyutil -p \(ClaudeCodeSignal.name(event))"
-        guard event == .done else { return "\(post) || true" }
-        return "d=\"$HOME/Library/Application Support/Sanduhr\"; /usr/bin/pgrep -xq Sanduhr && "
-            + "/usr/bin/grep -qs '\"background\":true' \"$d/\(WatcherStore.switchFile)\" && "
-            + "/usr/bin/osascript -l JavaScript -e '\(stopTasksScript)' \"$d\" >/dev/null 2>&1; \(post) || true"
+        "d=\"$HOME/Library/Application Support/Sanduhr\"; /usr/bin/pgrep -xq Sanduhr && "
+            + "/usr/bin/osascript -l JavaScript -e '\(signalScript)' \"$d\" \(event.rawValue) >/dev/null 2>&1; "
+            + "/usr/bin/notifyutil -p \(ClaudeCodeSignal.name(event)) || true"
     }
 
-    /// The Stop hook's report (item 66), JavaScript for Automation (`osascript`, on every Mac;
-    /// python3 may not be). Run with Sanduhr's folder as its one argument and the hook's input on
-    /// stdin, it keeps only the session id, the folder Claude Code runs with (CLAUDE_CONFIG_DIR,
-    /// for the work tag) and, per background task (at most 20), its id, type, status, description
-    /// (clipped to 120 characters) and workflow name. Never the shell command, never
-    /// `last_assistant_message`, never the transcript path. Written owner-only to a hidden
-    /// temporary name and renamed to `watch-stop-<ms>-<uuid>.json`, so the app never reads half a
-    /// file. No single quotes: it sits in single quotes in the command.
-    static let stopTasksScript = "function run(argv){ObjC.import(\"Foundation\");var d=argv[0];"
-        + "var i=$.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;"
-        + "var j=JSON.parse(ObjC.unwrap($.NSString.alloc.initWithDataEncoding(i,4)));"
-        + "var s=function(v,n){return typeof v===\"string\"?v.slice(0,n):null};"
+    /// The hook's one script (2.47), JavaScript for Automation (`osascript`, on every Mac; python3
+    /// may not be). Run with Sanduhr's folder and the event (`prompt`, `waiting` or `done`) as its
+    /// arguments and the hook's input on stdin, which it reads once and in full (on a prompt that
+    /// includes the prompt's text, which it drops):
+    /// - It writes `cc-signal-<ms>-<uuid>.json`, `{"v":1,"event":…,"cwd":…,"session":…,"at":<ms>}`,
+    ///   keeping only `cwd` (clipped to 1024) and `session_id` (128), never half a surrogate pair,
+    ///   unless `signalFileCap` signal files already wait. ClaudeCodeSignalFile reads it.
+    /// - On `done`, with watchers.json holding `"background":true` ("Show Claude Code's background
+    ///   work", item 66), it also writes `watch-stop-<ms>-<uuid>.json` (WatcherRequest.decodeStop):
+    ///   the session id (64), the folder Claude Code runs with (CLAUDE_CONFIG_DIR, for the work tag)
+    ///   and, per background task (at most 20), its id, type, status, description (120) and workflow
+    ///   name. Never the shell command, `last_assistant_message` or the transcript path.
+    ///
+    /// Each file is written owner-only under a hidden temporary name (`.cc-signal-….json.tmp`,
+    /// `.watch-stop-….tmp`) and renamed, so the app never reads half a file. No single quotes: it
+    /// sits in single quotes in the command. About 50 ms a run (2.47 build, median of five).
+    static let signalScript = "function run(argv){ObjC.import(\"Foundation\");var d=argv[0],v=argv[1],m=Date.now();"
+        + "if([\"prompt\",\"waiting\",\"done\"].indexOf(v)<0)return;"
+        + "var i=$.NSFileHandle.fileHandleWithStandardInput.readDataToEndOfFile;var j=null;"
+        + "try{j=JSON.parse(ObjC.unwrap($.NSString.alloc.initWithDataEncoding(i,4)))}catch(x){}"
+        + "if(!j||typeof j!==\"object\")j={};"
+        + "var c=function(x,n){if(typeof x!==\"string\")return null;x=x.slice(0,n);"
+        + "var k=x.charCodeAt(x.length-1);return k>=55296&&k<=56319?x.slice(0,-1):x};"
+        + "var f=$.NSFileManager.defaultManager;"
+        + "var w=function(t,p,o){var n=m+\"-\"+ObjC.unwrap($.NSUUID.UUID.UUIDString);var a=d+\"/.\"+p+n+t;"
+        + "if(f.createFileAtPathContentsAttributes(a,$(JSON.stringify(o)).dataUsingEncoding(4),"
+        + "$({NSFilePosixPermissions:384}))){f.moveItemAtPathToPathError(a,d+\"/\"+p+n+\".json\",null)}};"
+        + "var l=ObjC.deepUnwrap(f.contentsOfDirectoryAtPathError(d,null))||[];"
+        + "if(l.filter(function(x){return x.indexOf(\"\(ClaudeCodeSignalFile.namePrefix)\")===0&&x.slice(-5)===\".json\"})"
+        + ".length<\(signalFileCap))"
+        + "{w(\".json.tmp\",\"\(ClaudeCodeSignalFile.namePrefix)\",{v:1,event:v,"
+        + "cwd:c(j.cwd,\(ClaudeCodeSignalFile.maxCwdLength)),session:c(j.session_id,\(ClaudeCodeSignalFile.maxSessionLength)),"
+        + "at:m})}"
+        + "if(v!==\"done\")return;"
+        + "var b=ObjC.unwrap($.NSString.stringWithContentsOfFileEncodingError(d+\"/\(WatcherStore.switchFile)\",4,null));"
+        + "if(typeof b!==\"string\"||b.indexOf(\"\\\"background\\\":true\")<0)return;"
         + "var t=(Array.isArray(j.background_tasks)?j.background_tasks:[])"
         + ".filter(function(x){return x&&typeof x===\"object\"}).slice(0,20)"
-        + ".map(function(x){return{id:s(x.id,64),type:s(x.type,20),status:s(x.status,20),"
-        + "description:s(x.description,120),name:s(x.name,60)}});"
+        + ".map(function(x){return{id:c(x.id,64),type:c(x.type,20),status:c(x.status,20),"
+        + "description:c(x.description,120),name:c(x.name,60)}});"
         + "var e=ObjC.unwrap($.NSProcessInfo.processInfo.environment.objectForKey(\"CLAUDE_CONFIG_DIR\"));"
-        + "var o={schema_version:1,session:s(j.session_id,64),folder:typeof e===\"string\"?e:null,tasks:t};"
-        + "var n=Date.now()+\"-\"+ObjC.unwrap($.NSUUID.UUID.UUIDString);var f=$.NSFileManager.defaultManager;"
-        + "var p=d+\"/.\(WatcherStore.stopPrefix)\"+n+\".tmp\";"
-        + "if(f.createFileAtPathContentsAttributes(p,$(JSON.stringify(o)).dataUsingEncoding(4),"
-        + "$({NSFilePosixPermissions:384}))){f.moveItemAtPathToPathError(p,d+\"/\(WatcherStore.stopPrefix)\"+n+\".json\",null)}}"
+        + "w(\".tmp\",\"\(WatcherStore.stopPrefix)\",{schema_version:1,session:c(j.session_id,64),"
+        + "folder:typeof e===\"string\"?e:null,tasks:t})}"
 
     /// Sanduhr's entry in one event's list: a matcher group with one command hook, in the
     /// background (`async`) with a short timeout. `Notification` matches only the waiting kinds.
@@ -723,7 +747,7 @@ struct IntegrationInstaller {
         return Plan(bytes: result, receipt: receipt, other: nil)
     }
 
-    /// The hooks' install: Sanduhr's entry joins the `Notification` and `Stop` lists, `hooks`
+    /// The hooks' install: Sanduhr's entry joins the `UserPromptSubmit`, `Notification` and `Stop` lists, `hooks`
     /// and the lists made when missing, an older entry of Sanduhr's replaced where it stands,
     /// every other entry and hook left as it was.
     private func planInstallHooks(bytes b: [UInt8], root: [String: Any], top: JSONEdit.Object,
@@ -953,7 +977,7 @@ struct IntegrationInstaller {
         return result
     }
 
-    /// The hooks' remove: only Sanduhr's entries leave the two lists. A list Sanduhr made goes
+    /// The hooks' remove: only Sanduhr's entries leave the three lists. A list Sanduhr made goes
     /// once nothing else is in it, a list that was empty gets its old inside back, and `hooks`
     /// goes when Sanduhr made it and nothing else is in it. Lists are emptied in the reverse of
     /// the order Install filled them, so each emptied object gets back exactly what it held.
@@ -1050,7 +1074,7 @@ struct IntegrationInstaller {
     }
 
     /// The hooks' edit changed Sanduhr's entries and nothing else: the parsed files agree once
-    /// `hooks` is set aside; in `hooks`, every other event is the same; in the two lists, the
+    /// `hooks` is set aside; in `hooks`, every other event is the same; in the three lists, the
     /// other entries are the same in the same order; and each list holds Sanduhr's entry once
     /// (Install) or not at all (Remove). A list or `hooks` Sanduhr made or took out counts as
     /// empty.
