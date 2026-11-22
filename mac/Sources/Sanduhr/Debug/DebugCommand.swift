@@ -48,6 +48,9 @@ enum DebugAction: Equatable {
     /// Settings, Usage, Sources (2.46.0): the words in order, each applied through `SourcesSettingsModel` as
     /// the Sources group applies it. A refusal the group shows is the action's error.
     case sources([SourcesStep])
+    /// Agent notifications (2.47.0): a made-up turn event through `AgentNotifier.handle`, so the real rules decide,
+    /// or a Claude Code post routed as a Darwin post is, without posting one. See `DebugNotify`.
+    case notify(DebugNotify)
 
     enum SourcesStep: Equatable {
         /// Antigravity's activity-only switch.
@@ -157,7 +160,7 @@ enum DebugAction: Equatable {
     case widgetRemove(id: String)
 
     static let names = ["show-widget", "hide-widget", "settings", "settings-link", "settings-search", "close-settings", "refresh",
-                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "sources", "drawers", "camera-light", "glow",
+                        "test-alert", "pulse", "tool", "desk", "notch", "notch-pill", "just-the-desk", "setup", "sources", "notify", "drawers", "camera-light", "glow",
                         "theme", "account", "usage", "whats-new", "close-whats-new",
                         "tour", "tour-step", "close-tour", "watch-test", "av-test", "message-editor",
                         "desk-arrange", "hot-key", "reset", "mods-config", "widget-from-file", "widget-remove"]
@@ -269,6 +272,8 @@ enum DebugLink {
             return setupAction(arg)
         case "sources":
             return sourcesAction(arg)
+        case "notify":
+            return notifyAction(arg)
         case "drawers":
             guard let step = arg.flatMap({ DebugAction.DrawersStep(rawValue: $0.lowercased()) }) else {
                 return bad("drawers needs arg=on, sort, apply or off")

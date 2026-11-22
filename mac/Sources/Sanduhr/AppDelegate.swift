@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// stream and no timer: `update` does, and only for what is on.
     private lazy var agentWatcher = AgentActivityWatcher(
         homes: .live(), files: TurnDisk(), clock: Date.init, ticker: TimerTicker(),
-        events: { [weak self] in self?.agentNotifier.handle($0) })
+        events: { [weak self] in self?.routeAgentEvent($0) })
     /// Applies the rules to each turn event and calls the notification, the glow and the Desk card.
     private lazy var agentNotifier = AgentNotifier(
         settings: { AgentNotificationSettings.load(standard: UserDefaults.standard, desk: UserDefaults.desk) },
@@ -274,9 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         claudeCodeSignal = ClaudeCodeSignal { [weak self] event in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                AgentNotificationsWiring.handlePost(
-                    event, posted: { self.agentWatcher.claudeCodePosted() },
-                    legacyGlow: { NotchGlowController.shared.claudeCode($0) })
+                self.routeClaudeCodePost(event)
             }
         }
         // Claude Code integrations (item 49): where they are installed, this version's scripts
@@ -332,6 +330,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
         syncDeskSources()
         syncAgentNotifications()
+    }
+
+    /// One agent turn event to the notifier, remembering the decision for the smoke's state.yaml (`agent_notifications`).
+    private func routeAgentEvent(_ e: AgentTurnEvent) {
+        let decision = agentNotifier.handle(e)
+        agentEventCount += 1
+        lastAgentDecision = .of(e, decision)
+    }
+
+    private var agentEventCount = 0
+    private var lastAgentDecision: AgentNotificationsDebug.Last?
+
+    /// A Darwin post from Claude Code's hook: the signal files the watcher finds take the new path, a bare post is an
+    /// older hook's and glows as in 2.46. The smoke's `notify kind=post` runs this too, without posting a name.
+    private func routeClaudeCodePost(_ event: ClaudeCodeEvent) {
+        AgentNotificationsWiring.handlePost(
+            event, posted: { self.agentWatcher.claudeCodePosted() },
+            legacyGlow: { NotchGlowController.shared.claudeCode($0) })
+    }
+
+    /// The smoke hook's `notify`: a made-up turn through the notifier, or a post through the Darwin routing.
+    func notifyForSmoke(_ step: DebugNotify) {
+        switch step {
+        case .turn: if let e = step.event(at: Date()) { routeAgentEvent(e) }
+        case .post(let event): routeClaudeCodePost(event)
+        }
+    }
+
+    /// state.yaml's `agent_notifications`.
+    func agentNotificationsDebug() -> AgentNotificationsDebug {
+        let settings = AgentNotificationSettings.load(standard: UserDefaults.standard, desk: UserDefaults.desk)
+        return .of(settings: settings, events: agentEventCount, last: lastAgentDecision)
+    }
+
+    /// state.yaml's `agent_watch`: what the watcher follows, by label.
+    func agentWatchDebug() -> [AgentWatchDebug] {
+        AgentWatchDebug.rows(followed: agentWatcher.followedFolders, claudeSignals: agentWants.claude)
     }
 
     /// Settings, Notifications' Try it: a made-up sample through one real surface (never a real Darwin name, never a
