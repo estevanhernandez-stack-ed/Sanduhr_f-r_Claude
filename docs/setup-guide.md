@@ -186,7 +186,7 @@ You get your meters inside Claude Code, a notch that glows when Claude needs you
 4. Click **Install…** beside what you want:
    - **MCP server**: lets Claude Code ask Sanduhr about your usage, and suggest Desk messages, themes and song looks.
    - **Statusline**: your meters on a line under Claude Code's prompt.
-   - **Claude Code glow hook**: tells Sanduhr when Claude Code waits on you or finishes, so the notch can glow.
+   - **Claude Code glow hook**: tells Sanduhr when a Claude Code turn starts, waits on you or finishes, and in which folder, so Sanduhr can notify you, show a card on the Desk and glow the notch (see Settings, **Notifications**, below).
 5. A sheet says what it adds. Click **Install**.
 6. The box's last line, **Meters above the prompt: on** (or off, or not installed), is Sanduhr's mod that draws your meters as animated bars above the prompt. It is a mod, so it switches on Settings, **Mods & Config**: click **Mods & Config Settings…** right there.
 
@@ -201,7 +201,9 @@ Remove takes out exactly what Sanduhr added.
 
 **Already have a statusline?** The sheet offers **Combine** (keeps yours and adds Sanduhr's), **Replace** or **Cancel**. Combine lets you pick which pieces of each line stay and how they join. Check **Show Sanduhr's meters above the prompt instead (animated)** to keep your line as it is and put Sanduhr's meters above the prompt (turn on Meters above the prompt for the same folder, on Mods & Config).
 
-**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see it, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When Claude Code is waiting on you** or **When Claude Code finishes**. **Not while a terminal is in front** skips it when you're already looking: with a terminal or an editor that runs Claude Code in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed), it doesn't glow. At most one glow of each kind every 20 seconds. Screens without a notch glow at the top center.
+**Turn on the glow.** The Claude Code glow hook only tells Sanduhr. To see the glow, open Settings, **Notch** (or click **Notch Settings…** right there in Claude Code), and under **Notch glow** turn on **When an agent is waiting on you** or **When an agent finishes**. These are the same switches as on Settings, **Notifications**, and cover Codex and the Antigravity CLI too. **Not while the agent's app is in front** skips it when you're already looking: with a terminal or an editor that runs the agent in front (Terminal, iTerm2, Ghostty, Warp, WezTerm, Alacritty, kitty, VS Code, Cursor, Zed; for Codex, the Codex app too), it doesn't glow. At most one glow of each kind every 20 seconds. Screens without a notch glow at the top center. A finished glow waits for a turn of a minute or more once the hook is updated (change it under **Only for turns longer than** on Notifications; **Every turn** is the old behavior).
+
+**Notifications and the Desk card.** Settings, **Notifications** has a switch for a macOS notification and for a card on the Desk, on by default, beside the glow's. Update the Claude Code glow hook (an older one shows **Outdated** and keeps glowing as before) to get them for Claude Code; Codex and the Antigravity CLI notify while their switch in Settings, **Usage**, **Sources** is on. **Try it** shows a sample of each.
 
 **Share with your agents.** The MCP server shares nothing until you say so, per account:
 

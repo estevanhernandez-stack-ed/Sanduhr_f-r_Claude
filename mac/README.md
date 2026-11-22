@@ -568,7 +568,7 @@ was. The mod needs no python3. The mod's files ride in the stamped folder (`buil
 without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
 folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
-**The Claude Code glow hook (item 51; "the notch glow hooks" before Settings v2).** The fourth kind needs no scripts and no python3: Install adds
+**The Claude Code glow hook (item 51; "the notch glow hooks" before Settings v2).** *2.47.0 widened it: three events and one script, see Agent notifications; the entries and the Stop command below are 2.46's, kept for the older generations Update still recognizes.* The fourth kind needs no scripts and no python3: Install adds
 one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen folder's
 `settings.json`, in the shape of Claude Code's settings schema (`{matcher?, hooks: [{type:
 "command", command, async, timeout}]}`):
@@ -943,6 +943,148 @@ throws on a bad or truncated frame. To update: download the new release tarball,
 tarball's `build/single_file_libs/combine.py -r ../../lib -x legacy/zstd_legacy.h -o zstddeclib.c zstddeclib-in.c` (the amalgamator
 `create_single_file_decoder.sh` runs), then replace the `.c`, the two headers and the tag and hash in the comment together. `ZstdTests`
 uses a made-up text fixture compressed once with the zstd CLI.
+
+## Agent notifications (2.47.0)
+
+A notification, the notch glow and a Desk card when Claude Code, Codex or the Antigravity CLI finishes a long turn, and when
+Claude Code waits on you. The Mac port of Windows 5.0's agent notifications: the design is
+`docs/superpowers/specs/2026-11-21-mac-agent-notifications-design.md`, the plan the same name under `plans/`, and the run's
+decisions D1 to D10 are in `docs/cart-runs/2026-11-21-mac-agent-notifications-2-47/decisions.md`. There is no fourth surface:
+Windows' taskbar flash has no Mac counterpart and the menu bar and the Dock stay quiet.
+
+**Signals per agent.** Everything becomes an `AgentTurnEvent` (`Services/AgentTurns.swift`: agent, kind `started`, `finished`,
+`stopped`, `waiting` or `idle`, project name, session, time, duration).
+- **Claude Code** comes from the hook (below): a prompt sent is `started`, a Notification is `waiting` (or `idle` when no turn
+  is open), Stop is `finished`; the duration is `finished` minus the session's last `started`, unknown without one.
+- **Codex** comes from its rollouts (`CodexTurnReader`): `task_started`, `task_complete` (the duration from `duration_ms`) and
+  `turn_aborted` (`stopped`). The project is the `cwd` of the `turn_context` in force; a rollout whose `session_meta` names
+  `forked_from_id` or `parent_thread_id` is a sub-agent's and notifies nobody (the mark sticks). Compressed rollouts are
+  finished history and are never followed.
+- **The Antigravity CLI** comes from `brain/*/.system_generated/logs/transcript.jsonl` (`AntigravityTurnReader`): `USER_INPUT`
+  is `started`; a `PLANNER_RESPONSE` with status `DONE` and no `tool_calls` key arms a 90-second wait, any new line cancels it,
+  and expiry raises `finished` timed by that step, so the notification arrives about a minute and a half late. There is no
+  `stopped`. The project is the 2.46 summaries lookup. Only whether the `tool_calls` key exists is read, never its value.
+Neither Codex nor the Antigravity CLI writes a waiting signal, so neither ever says "waiting".
+
+**The hook and its script.** Install and Update write three entries in each linked folder's `settings.json`:
+`UserPromptSubmit` (`prompt`), `Notification` with the old matcher `permission_prompt|idle_prompt|elicitation_dialog`
+(`waiting`) and `Stop` (`done`), each `async` with a 5-second timeout. One command serves all three
+(`IntegrationInstaller.hookCommand`):
+
+```sh
+d="$HOME/Library/Application Support/Sanduhr"; /usr/bin/pgrep -xq Sanduhr &&
+  /usr/bin/osascript -l JavaScript -e '<signalScript>' "$d" <prompt|waiting|done> >/dev/null 2>&1;
+  /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.<prompt|waiting|done> || true
+```
+
+`signalScript` (JavaScript for Automation, on every Mac; python3 may not be) reads the hook's whole input once, which on a
+prompt includes the prompt's text, and keeps only `cwd` (clipped to 1024) and `session_id` (128). It writes
+`cc-signal-<unix ms>-<uuid>.json`, `{"v":1,"event":"prompt"|"waiting"|"done","cwd":…,"session":…,"at":<ms>}`, mode 0600, under
+the hidden name `.cc-signal-….json.tmp` and renames it, so the app never reads half a file; it writes nothing once 100 signal files
+wait. On `done` it also writes item 66's `watch-stop-*.json` background report (only while `watchers.json` holds
+`"background":true`), because the input can be read only once; the `pgrep` gate stays in the shell. Its text holds no single
+quote and is pinned by `SignalScriptTests`, which also runs it. Measured on 2.47: a median 47.5 ms per prompt, 50.5 ms on
+done with background on, none of it waited on by Claude Code. The post comes after the rename, so a post from this hook always
+finds its file.
+
+**Routing a post: new or bare.** `ClaudeCodeSignal` registers the three names with `notify_register_dispatch`. On any post
+`AgentNotificationsWiring.handlePost` first has the watcher read the waiting signal files. Files found: the post is the new
+hook's, the rules decide everything and the legacy glow does not fire (`Route.notifications`). No file: an older hook (or a
+file the 100-file cap dropped), so a bare `waiting` or `done` lights the notch glow under the glow switches exactly as in
+2.46 and nothing else (`Route.legacyGlow`); a bare `prompt` is nothing. Each file is read and deleted at once; one older than
+10 minutes, over 4 KB or malformed is deleted unread, a leftover `.cc-signal-….tmp` older than 10 minutes is removed, and a
+timestamp more than 60 seconds ahead is dropped. A malformed stdin still writes a signal, with no identity (the `-` session).
+Every older hook command (item 51's open-link, item 66's, 2.46's) reads as Outdated and Install or Update rewrites it in place.
+The `sanduhr://claude-code` link keeps 2.46's two events (`waiting` and `done`) and nothing else. At launch nothing replays:
+the first pass over waiting files records each turn's start and raises nothing.
+
+**Following the files** (`AgentActivityWatcher`). One FSEvents stream per followed agent home, filtered to the rollout and
+transcript paths, falls back to a 30-second poll if the stream fails; a ticker runs only while it has work (5 seconds while an
+Antigravity end is armed, 30 while polling). Offsets are kept in memory per file, with a torn last line held for the next read.
+At launch a file changed in the last 10 minutes is read from up to its last 4 MB to learn whether a turn is open, without
+notifying; an older file starts at its end and is read when it grows. A missing home is not followed and is noticed on a later
+`update`. Paths go through `realpath`, since Foundation strips `/private`. Codex's homes are `CodexHomes` (`~/.codex` plus the
+app's own `CODEX_HOME`, as 2.46); the Antigravity CLI's is `~/.gemini/antigravity-cli`. An agent is followed only while its
+switch is on (Codex and Antigravity: Sources; Claude Code: the updated hook in at least one folder, an outdated hook doesn't
+count, and the claude.ai usage source plays no part, D9). Demo mode follows nothing. A Mac with only Claude's usage on and no
+updated hook follows no stream and runs no timer.
+
+**The rules** (`NotificationRules.decide`, pure). In this order: the idle switch, `started` (never interrupts), the threshold,
+the surfaces' switches, quiet hours, then the front app (read lazily, only when an interrupt is otherwise due) and the limiter
+(one kind at most every 20 s per agent and session, no `finished` within 5 s of a `waiting`; quiet hours and the front-app
+rule never use up a slot).
+
+| Event | Notification and glow | Desk card |
+|---|---|---|
+| `started` | Never | A card with a running timer |
+| `finished` | At the threshold or longer, with the agent's app not in front | Always |
+| `stopped` | As `finished`, worded "stopped" | Always |
+| `waiting` | At once, unless the agent's app is in front | Always |
+| `idle` (Claude Code) | Only with the idle switch on, then as `waiting`; shares the waiting glow switch and slot | Never |
+
+An unknown duration never interrupts unless the threshold is Every turn. "In front" is `NSWorkspace.frontmostApplication`'s bundle
+id against `ClaudeCodeGlowRules.terminalBundleIDs` for every agent, plus, for Codex, an app named "Codex" or a bundle id starting
+`com.openai.` (D3; the exact id was not readable on a Mac without Codex, so a wrong match only means a notification while the
+Codex app is in front). The repeat of an end (same agent, session, kind and time) that the limiter would let through after 20 s
+is dropped, so a wake after sleep raises one notification and never a negative time.
+
+**Surfaces.**
+- **Notification** (`AgentNotifier`, `Notifier.postAgent`): title "Claude Code finished", "Codex stopped" or "Claude Code is
+  waiting on you"; body "your-project, 4m 12s" (the project alone for waiting and the idle reminder; durations print zero-padded,
+  "45s", "4m 05s", "1h 02m"). The identifier is `agent-<agent>-<session>`, so a session's newer notification replaces its older
+  one; the idle reminder has its own. Thread `sanduhr-agents`; the alert sound setting applies. A click shows the widget
+  (`AppDelegate.showPanel()`); limit alerts' banners and clicks are unchanged (pinned). Quiet hours (`AlertSettings.quietEnabled`,
+  `quietStart`, `quietEnd`) hold the notification and the glow; Alerts' master switch and delivery route are not consulted.
+- **Notch glow** (`NotchGlowController`): `fire()` takes an optional `#RRGGBB`. `finished` and `stopped` glow in the agent's Sources
+  color; `waiting`, `idle` and every other glow keep the notch ink. Where it shows follows the existing target settings.
+- **Desk turn card** (`WatcherSource.turn` on the watchers board, `WatcherBoard.applyTurn`): "Codex · your-project", a running
+  time starting at the event's own time (clamped to the last hour), then "finished · 4m" for about a minute before it fades; a
+  `started` on a running session refreshes it. A running card loses touch after an hour (Antigravity's after 10 minutes) and is
+  removed 60 seconds later; a turn still writing keeps it alive, with activity reported at most once a minute. The card needs
+  the watchers piece placed and not "Let Claude show watchers", stays out of the Claude Code band, and is hidden in demo mode.
+  Switching an agent off, or the card switch, clears its cards.
+
+**Settings ▸ Notifications** (`SettingsSection.notifications`, icon `bell.badge`, after Alerts; `NotificationsSettingsView`, words
+in `NotificationsPageCopy`): a row per agent (what it supports, its switch state, and for Claude Code each linked folder's hook
+status with Update; Codex and Antigravity read "Switch it on in Usage ▸ Sources" while off), the notification, glow and card
+switches, "Only for turns longer than" (Every turn, 30 seconds, 1 minute, 2 minutes, 5 minutes; waiting always counts), "Not while the
+agent's app is in front", the idle reminder, and **Try it** per surface, which shows a sample through `AgentNotifier.tryIt`
+whatever the switches say. macOS permission is asked when the notification switch turns on or its Try it is pressed; while macOS
+has not been asked an "Allow Notifications" line is there, and a refusal shows a line with Open System Settings. The glow
+switches are the Desk-defaults keys Notch ▸ Glow already shows (`notchGlowClaudeDone`, `notchGlowClaudeWaiting`,
+`notchGlowClaudeSkipTerminal`), their captions widened from Claude Code to every agent, so nothing is migrated.
+
+| Setting | Key (standard defaults unless noted) | Default |
+|---|---|---|
+| Notification | `agentNotifications.banner` | On |
+| Desk card | `agentNotifications.card` | On |
+| Glow on finished / on waiting | `notchGlowClaudeDone`, `notchGlowClaudeWaiting` (Desk defaults) | Off, unchanged on upgrade |
+| Not while in front | `notchGlowClaudeSkipTerminal` (Desk defaults) | On |
+| Threshold, seconds (0 is Every turn) | `agentNotifications.threshold` | 60 |
+| Idle reminder | `agentNotifications.idle` | Off; On once if `notchGlowClaudeWaiting` was on |
+| Upgrade rule ran | `agentNotifications.migrated` | set at first launch of 2.47.0 |
+
+A change for people who had the glow on: with the updated hook, a finished glow waits for a one-minute turn; Every turn restores
+the old behavior (the CHANGELOG says so). An outdated hook's glow is unchanged.
+
+**Privacy.** No network, no new library and no new permission beyond the notification one the app already asks for. Codex and
+Antigravity files are the ones 2.46 reads, now also for turn markers and step status, never `last_agent_message`, a step's
+`content`, `thinking` or `tool_calls` value, or any message text. The hook reads the prompt on stdin and keeps only the folder and
+session. `cc-signal-*.json` holds a folder path and a session id and is deleted as read; turn state lives in memory only; the
+notification's text (agent, project, duration) stays in macOS Notification Center until cleared. Reset Sanduhr… removes any signal
+file with the rest of Sanduhr's folder (step 3). Failures: an unparsable line is skipped and never thrown out of the watcher, a
+malformed, oversized or stale signal file is deleted unread, a Codex rollout compressed or removed mid-turn drops that turn (no
+`finished` is invented), and a surface that throws is logged by type without stopping the others.
+
+**Smoke.** `smoke do notify agent=<claude|codex|antigravity> kind=<started|finished|stopped|waiting|idle> [session= project= duration=]`
+feeds a made-up event to `AgentNotifier.handle`, so the real rules decide (switches, threshold, quiet hours, front app, limiter);
+`notify kind=post event=prompt|waiting|done` runs the routing a Claude Code post takes without posting a Darwin name (drop a
+`cc-signal-<unix ms>-<random>.json` into Sanduhr's folder first for the file path; with none it is a bare post). `state.yaml` has
+`agent_notifications` (the settings, `events` handed to the notifier and `last`: agent, kind, the three surface flags, glow color,
+title and body), `turn_cards` (agent, project, state and whole seconds) and `agent_watch` (what is followed, by folder label and
+mode `fsevents`, `polling` or `post`; never a path). A banner posts a real notification, so a run that raises one leaves it in
+Notification Center. Section 81 of `docs/mac-smoke-test.md` walks it; `smoke/README.md` has the syntax and
+`smoke/selftest.rb` the fixtures. The idle CPU bar with Codex and Antigravity on and quiet is under 1 percent of a core, measured with cputime deltas (section 81).
 
 ## Mods
 
@@ -1339,30 +1481,30 @@ dropped) and updates the board (`WatcherBoard`, pure). `work: true` from the age
 a Claude Code folder (`CLAUDE_CONFIG_DIR`, else `~/.claude`) linked to an account marked **Work
 account** in Settings, Accounts, Data, tags the watcher: work watchers hide while demo mode is on.
 
-**Claude Code's background work.** The Stop hook the notch glow install writes now also hands over
-the session's `background_tasks` (Claude Code 2.1.288's `StopHookInput`), only while `watchers.json`
-says `"background":true`:
+**Claude Code's background work.** The Stop event of the Claude Code hook also hands over the session's
+`background_tasks` (Claude Code 2.1.288's `StopHookInput`), only while `watchers.json` says `"background":true`. Since 2.47.0
+that is the same one script that writes the notification signal (`signalScript`, see Agent notifications; Claude Code's input
+can be read only once, so one script does both). The command, as `IntegrationInstaller.hookCommand` writes it for every event
+(`done` here):
 
 ```sh
 d="$HOME/Library/Application Support/Sanduhr"; /usr/bin/pgrep -xq Sanduhr &&
-  /usr/bin/grep -qs '"background":true' "$d/watchers.json" &&
-  /usr/bin/osascript -l JavaScript -e '<stopTasksScript>' "$d" >/dev/null 2>&1;
+  /usr/bin/osascript -l JavaScript -e '<signalScript>' "$d" done >/dev/null 2>&1;
   /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.done || true
 ```
 
-`pgrep` only gates the report (watchers.json outlives a quit Sanduhr): no report waits in the
-folder for a later launch, and one written longer ago than a request's ten minutes is deleted
-unread anyway (`WatcherStore.isStale`). The notification is posted either way.
+`pgrep` gates the script (watchers.json outlives a quit Sanduhr): no report or signal waits in the folder for a later launch,
+and a report written longer ago than a request's ten minutes is deleted unread anyway (`WatcherStore.isStale`). The post is
+made either way. Before 2.47.0 the Stop command ran a separate `stopTasksScript` behind a shell `grep` of `watchers.json`; that
+text is gone, and that command is one of the older generations that read as Outdated.
 
-`stopTasksScript` (JavaScript for Automation, on every Mac; python3 may not be) keeps the session id,
-`CLAUDE_CONFIG_DIR` and per task (at most 20) only `id`, `type`, `status`, `description` (clipped to
-120) and a workflow's `name`; never `command`, `last_assistant_message`, `transcript_path` or `cwd`.
-It writes `watch-stop-<ms>-<uuid>.json` (0600, renamed into place) and the app deletes it on reading.
-Each task becomes a watcher (`b:<session>:<task id>`, the description as title, "background shell",
-"workflow deploy" and so on as the note); a task missing from the session's next Stop ends as
-finished (result unknown). The glow notification is posted either way, so item 51's glow is
-unchanged.
-Installs from before this version show **Outdated**; Install rewrites the Stop entry in place.
+On `done`, with background on, the script keeps the session id, `CLAUDE_CONFIG_DIR` and per task (at most 20) only `id`,
+`type`, `status`, `description` (clipped to 120) and a workflow's `name`; never `command`, `last_assistant_message`,
+`transcript_path` or `cwd`. It writes `watch-stop-<ms>-<uuid>.json` (0600, renamed into place) and the app deletes it on reading.
+Each task becomes a watcher (`b:<session>:<task id>`, the description as title, "background shell", "workflow deploy" and so on
+as the note); a task missing from the session's next Stop ends as finished (result unknown). The glow still fires as in
+item 51 on a bare post, and a post with a signal file goes down the notification path instead.
+Installs from before this version show **Outdated**; Update rewrites the entries in place.
 
 **Above Claude Code's prompt.** **Show watchers above the prompt** (off by default) hands the
 watchers to the meters mod through `band.json` (see the meters mod above): a row each above the
@@ -2599,6 +2741,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - CI runner cards (2.38.0) → the preference `watchersCiRunners` (off when absent); nothing on disk, the cards live in memory
 - Drawers (2.40.0) → the `drawers.*` preferences in `com.626labs.sanduhr.desk` and `~/Library/Application Support/Sanduhr/drawers-journal.json` (mode 0600, holds full paths, so file names); the folders themselves are real folders on the Mac, `~/Desktop/Drawers/<Name>` by default; Reset Sanduhr… puts the files back first and removes the preferences and the journal
 - Agent sources (2.46.0) → `history.@codex.json` and `snapshot.codex.json` in `~/Library/Application Support/Sanduhr/` (see Agent sources); the Vault's `vault/codex/` and `vault/antigravity/` roots; the preferences `sources.primary`, `sources.<id>.color`, `sources.antigravity.on` and `vault.agentStopped.<agent>` in `com.626labs.sanduhr`, and Codex's switch inside the setup's `usage` entry. Reset Sanduhr… removes them with the folder and the domain
+- Agent notifications (2.47.0) → `cc-signal-<ms>-<uuid>.json` (and the hidden `.cc-signal-….json.tmp` before its rename) in `~/Library/Application Support/Sanduhr/`, mode 0600, written by the Claude Code hook with a folder path and a session id, deleted as read (Reset removes any left with the folder's other contents); the preferences `agentNotifications.banner`, `.card`, `.threshold`, `.idle` and `.migrated` in `com.626labs.sanduhr`, and the glow's three existing switches in `com.626labs.sanduhr.desk`; turn state is in memory only
 
 ## Controls
 
