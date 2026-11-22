@@ -53,7 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         events: { [weak self] in self?.agentNotifier.handle($0) })
     /// Applies the rules to each turn event and calls the notification, the glow and the Desk card.
     private lazy var agentNotifier = AgentNotifier(
-        settings: { AgentNotificationsWiring.interimSettings(desk: UserDefaults.desk, standard: UserDefaults.standard) },
+        settings: { AgentNotificationSettings.load(standard: UserDefaults.standard, desk: UserDefaults.desk) },
         banner: { Notifier.shared.postAgent($0) },
         glow: { NotchGlowController.shared.fire(topFallback: true, color: $0) },
         card: { WatcherStore.shared.applyTurn($0) },
@@ -103,6 +103,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // keeps usage on, Just the Desk alone leaves it off (SetupMigration).
         Self.runSetupMigration()
         lastUsageOn = viewModel.usageOn
+        // Agent notifications' upgrade rule, once: the idle reminder follows an old "glow when waiting".
+        AgentNotificationSettings.migrateOnce(standard: UserDefaults.standard, desk: UserDefaults.desk)
 
         // Build widget panel.
         let hosting = NSHostingController(rootView: RootView(vm: viewModel, sources: widgetSources, codex: codexUsage))
@@ -330,6 +332,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setup: SetupStore.load(), sources: AgentSourceSettings.load(), demo: viewModel.demo))
         syncDeskSources()
         syncAgentNotifications()
+    }
+
+    /// Settings, Notifications' Try it: a made-up sample through one real surface (never a real Darwin name, never a
+    /// file read).
+    func tryAgentNotification(_ surface: AgentNotifier.TrySurface) {
+        agentNotifier.tryIt(surface)
     }
 
     /// Starts and stops what follows the agents from the stored setup, the Sources switches, demo mode and the

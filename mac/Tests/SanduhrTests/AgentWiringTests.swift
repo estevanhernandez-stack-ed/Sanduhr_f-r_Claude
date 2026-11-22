@@ -170,38 +170,3 @@ struct AgentWiringIdleTests {
         #expect(fx.streams.live.count == 1 && fx.streams.made.count == 1)
     }
 }
-
-@Suite("Agent notifications wiring: settings until the page lands")
-struct AgentWiringSettingsTests {
-    @Test func defaultsArePlanDefaultsAndGlowFollowsTheDeskKeys() {
-        let s = AgentNotificationsWiring.interimSettings(desk: MemoryDefaults(), standard: MemoryDefaults())
-        #expect(s.banner && s.card && !s.idle && s.skipInFront)
-        #expect(!s.glowFinished && !s.glowWaiting)
-        #expect(s.threshold == 60)
-        #expect(!s.quiet.enabled)
-    }
-
-    @Test func existingKeysCarryOver() {
-        let desk = MemoryDefaults(), std = MemoryDefaults()
-        desk.set(true, forKey: NotchGlowSwitches.claudeDoneKey)
-        desk.set(true, forKey: NotchGlowSwitches.claudeWaitingKey)
-        desk.set(false, forKey: NotchGlowSwitches.claudeSkipTerminalKey)
-        std.set(false, forKey: "agentNotifications.banner")
-        std.set(120.0, forKey: "agentNotifications.threshold")
-        std.set(true, forKey: "agentNotifications.idle")
-        std.set(true, forKey: Notifier.Key.quietEnabled)
-        std.set(1380, forKey: Notifier.Key.quietStart)
-        std.set(420, forKey: Notifier.Key.quietEnd)
-        let s = AgentNotificationsWiring.interimSettings(desk: desk, standard: std)
-        #expect(s.glowFinished && s.glowWaiting && !s.skipInFront)
-        #expect(!s.banner && s.card && s.idle)
-        #expect(s.threshold == 120)
-        #expect(s.quiet.enabled && s.quiet.start == 1380 && s.quiet.end == 420)
-    }
-
-    @Test func zeroThresholdMeansEveryTurn() {
-        let std = MemoryDefaults()
-        std.set(0, forKey: "agentNotifications.threshold")
-        #expect(AgentNotificationsWiring.interimSettings(desk: MemoryDefaults(), standard: std).threshold == 0)
-    }
-}

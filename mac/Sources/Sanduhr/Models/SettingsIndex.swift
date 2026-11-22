@@ -40,6 +40,12 @@ enum SettingsAnchor {
     static let signInReminder = "sign-in-reminder"
     /// Alerts, Each limit (was the Meters page, raw value `deskMeters`).
     static let eachLimit = "each-limit"
+    // Notifications
+    static let notifyAgents = "agents"
+    static let notifyWhere = "where-it-shows"
+    static let notifyWhen = "when"
+    static let notifyIdle = "idle-reminder"
+    static let notifyTry = "try-it"
     // Desk
     static let desk = "desk"
     static let arrange = "arrange"
@@ -132,7 +138,7 @@ enum SettingsAnchor {
     static let advanced = "advanced"
 
     /// Every anchor in sidebar order, page by page, with its title and synonyms.
-    static let all: [SettingsEntry] = general + accountsAndAlerts + deskPages + notchPages + lockScreenPages + drawersPages + widgetsPages + claudeCodePages + widgetAndHelp
+    static let all: [SettingsEntry] = general + accountsAndAlerts + notificationsPages + deskPages + notchPages + lockScreenPages + drawersPages + widgetsPages + claudeCodePages + widgetAndHelp
 
     private static let general: [SettingsEntry] = [
         SettingsEntry(title: SetupCopy.menuItem, page: .general, anchor: setup,
@@ -167,6 +173,23 @@ enum SettingsAnchor {
                       synonyms: [SignInReminder.title, "sign in", "signed out", "without Claude"]),
         SettingsEntry(title: "Each limit", page: .alerts, anchor: eachLimit,
                       synonyms: ["Warn when nearly full", "red", "temporary limit", "Show this limit", "hide limit", "meters"]),
+    ]
+
+    private static let notificationsPages: [SettingsEntry] = [
+        SettingsEntry(title: NotificationsPageCopy.agentsHeader, page: .notifications, anchor: notifyAgents,
+                      synonyms: ["Claude Code", "Codex", "Antigravity", "hook", "Update", "Sources", "agent"]),
+        SettingsEntry(title: NotificationsPageCopy.showHeader, page: .notifications, anchor: notifyWhere,
+                      synonyms: [NotificationsPageCopy.banner, NotificationsPageCopy.glowFinished,
+                                 NotificationsPageCopy.glowWaiting, NotificationsPageCopy.card, "notification", "banner",
+                                 "glow", "card", "Desk", "permission", "System Settings"]),
+        SettingsEntry(title: NotificationsPageCopy.threshold, page: .notifications, anchor: notifyWhen,
+                      synonyms: ["threshold", "Every turn", "long turn", "minute", NotificationsPageCopy.skipInFront,
+                                 "terminal", "in front", "quiet hours"]),
+        // Titled short, and without the word "prompt" in its synonyms: a search for "prompt" belongs to Claude Code.
+        SettingsEntry(title: "Idle reminder", page: .notifications, anchor: notifyIdle,
+                      synonyms: ["Remind me when Claude Code has waited a minute", "idle", "waiting", "reminder"]),
+        SettingsEntry(title: NotificationsPageCopy.tryIt, page: .notifications, anchor: notifyTry,
+                      synonyms: ["sample", "test", "preview"]),
     ]
 
     private static let deskPages: [SettingsEntry] = [
@@ -351,6 +374,7 @@ enum SettingsSearch {
         .credentials: ["sign in", "account"],
         .usage: ["history", "tokens", "records", "trends", "sessions", "meter history", "chart", "csv", "export"],
         .alerts: ["notification", "warning"],
+        .notifications: ["agent", "banner", "glow", "Claude Code", "Codex", "Antigravity", "turn", "finished", "waiting"],
         .integrations: ["statusline", "prompt", "MCP", "Integrations"],
         .mods: ["mods", "plugins", "config"],
         .widgetLook: ["Widget Look", "Pacing & Focus"],
