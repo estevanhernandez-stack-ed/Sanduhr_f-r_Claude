@@ -181,6 +181,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        if kind == .hooks { NotificationCenter.default.post(name: .sanduhrHooksDidChange, object: nil) }
         switch outcome {
         case .success(.installed):
             // The band takes Sanduhr's segment looks from Combine; Replace clears them (item 65f).
@@ -285,6 +286,7 @@ final class IntegrationsModel {
             }
         }.value
         await load(linked: linked)
+        if kind == .hooks { NotificationCenter.default.post(name: .sanduhrHooksDidChange, object: nil) }
         noteFolder = folder
         note = failure.map { (message($0), true) }
             ?? ("\(kind.title) removed from \(display(folder)).", false)
