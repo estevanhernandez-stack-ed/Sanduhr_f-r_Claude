@@ -271,6 +271,15 @@ enum NotchStripCover {
     }
 }
 
+/// The glow's ink: the notch ink, or, for a finished or stopped agent turn, the agent's Sources color
+/// (agent notifications, 2.47.0). Pure.
+enum NotchGlowInk {
+    /// `color` (`#RRGGBB`) as an ink spec when it is a color, else `ink` unchanged.
+    static func resolve(color: String?, ink: String) -> String {
+        color.flatMap(DeskThemeMapping.normalized) ?? ink
+    }
+}
+
 /// What the last glow outlined (smoke's glow_shape).
 enum NotchGlowShape: String {
     /// The extended island: wings, and the strip under the camera when there is one.
@@ -293,9 +302,13 @@ struct NotchHaloView: View {
     let radius: CGFloat
     /// Horizontal offset of the outline from the window's center (wings of unequal width).
     var offsetX: CGFloat = 0
+    /// An agent's `#RRGGBB` for a finished turn's glow; nil glows in the notch ink.
+    var color: String?
     @AppStorage("notchTextColor", store: .desk) private var savedTextColor = "ffffff"
     /// The saved notch color, or the palette a widget proposal is previewing with (DeskInkPreview).
-    private var textColor: String { DeskInkPreview.shared.resolved(saved: savedTextColor) }
+    private var textColor: String {
+        NotchGlowInk.resolve(color: color, ink: DeskInkPreview.shared.resolved(saved: savedTextColor))
+    }
 
     var body: some View {
         let reach = NotchGlowLayout.reach
@@ -333,6 +346,8 @@ struct NotchGlowView: View {
     let barHeight: CGFloat
     /// False when an app window hides the strip under the camera: the halo hugs the wings alone.
     var stripVisible = true
+    /// An agent's color for the halo; nil is the notch ink.
+    var color: String?
     @AppStorage("notchWings", store: .desk) private var wings = 36.0
     @AppStorage("notchChin", store: .desk) private var savedChin = 26.0
     @AppStorage("notchText", store: .desk) private var showText = true
@@ -352,7 +367,7 @@ struct NotchGlowView: View {
         NotchHaloView(width: notchWidth + w.left + w.right,
                       height: NotchGlowLayout.islandHeight(notchHeight: notchHeight, barHeight: barHeight, chin: chin),
                       radius: NotchGlowLayout.radius(barHeight: barHeight, chin: chin),
-                      offsetX: (w.right - w.left) / 2)
+                      offsetX: (w.right - w.left) / 2, color: color)
     }
 }
 
@@ -384,6 +399,8 @@ final class NotchGlowController {
     private(set) var count = 0
     /// What the last glow outlined (smoke's glow_shape); `.none` until one is drawn.
     private(set) var lastShape = NotchGlowShape.none
+    /// The last glow's color as asked for: an agent's `#RRGGBB`, nil for the notch ink.
+    private(set) var lastColor: String?
     private var memory = NotchGlowMemory()
     private var meetingTimer: Timer?
     /// Bumped on every glow, so an older glow's fade-out cannot end a newer one.
@@ -433,9 +450,11 @@ final class NotchGlowController {
 
     /// Glows once, whatever the switches (a Desk pulse and the debug action call this directly).
     /// With `topFallback`, a Mac with no notched screen glows at the top center of the main
-    /// screen instead of not at all.
-    func fire(topFallback: Bool = false) {
+    /// screen instead of not at all. `color` (`#RRGGBB`) is a finished agent turn's; nil, every other
+    /// glow's, is the notch ink.
+    func fire(topFallback: Bool = false, color: String? = nil) {
         count += 1
+        lastColor = color
         // Settings, Notch's preview (item 68) glows its island with the real one.
         NotificationCenter.default.post(name: Self.didFire, object: nil)
         let desk = DeskController.shared
@@ -459,13 +478,14 @@ final class NotchGlowController {
             frame = NotchGlowLayout.frame(wings: wings.frame, islandHeight: island)
             content = AnyView(NotchGlowView(model: desk.model, notchWidth: notch.width,
                                             notchHeight: notch.height, barHeight: barHeight,
-                                            stripVisible: visible))
+                                            stripVisible: visible, color: color))
         case .plain:
             guard let screen, let notch = screen.cameraNotch else { return }
             frame = NotchGlowLayout.plainFrame(screen: screen.frame, notch: notch)
             let cut = NotchGlowLayout.plainCutout(notch: notch)
             content = AnyView(NotchHaloView(width: cut.width, height: cut.height,
-                                            radius: NotchGlowLayout.plainRadius(notchHeight: notch.height)))
+                                            radius: NotchGlowLayout.plainRadius(notchHeight: notch.height),
+                                            color: color))
         case .top:
             guard let main = desk.pillWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
             // A hidden menu bar leaves no inset: use the bar's usual thickness.
@@ -477,7 +497,8 @@ final class NotchGlowController {
                 ?? NotchGlowLayout.topSpot(screenWidth: main.frame.width, barHeight: bar)
             frame = NotchGlowLayout.plainFrame(screen: main.frame, notch: spot)
             content = AnyView(NotchHaloView(width: spot.width, height: spot.height,
-                                            radius: NotchGlowLayout.plainRadius(notchHeight: spot.height)))
+                                            radius: NotchGlowLayout.plainRadius(notchHeight: spot.height),
+                                            color: color))
         case .none:
             return
         }

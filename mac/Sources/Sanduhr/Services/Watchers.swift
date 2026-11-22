@@ -56,6 +56,9 @@ enum WatcherSource: String, Sendable {
     case automatic
     /// A job on a local CI runner container, from its log (RunnerLog, RunnerBoard).
     case runner
+    /// An agent's turn (agent notifications, 2.47.0): Claude Code's, Codex's or the Antigravity CLI's,
+    /// from AgentNotifier. Not gated by "Let agents show watchers", which is the MCP's.
+    case turn
 }
 
 struct Watcher: Equatable, Identifiable, Sendable {
@@ -79,10 +82,10 @@ struct Watcher: Equatable, Identifiable, Sendable {
     /// From a Claude Code folder linked to a work account, or flagged by the agent: hidden while
     /// demo mode is on.
     var work = false
-    /// The Claude Code session an automatic watcher belongs to.
+    /// The Claude Code session an automatic watcher belongs to; a turn card's agent session.
     var session: String?
     /// An automatic watcher's kind of task (shell, subagent, monitor, workflow): all the band file
-    /// (BandFile) says of it besides its state.
+    /// (BandFile) says of it besides its state. A turn card's agent (`AgentSource.rawValue`).
     var kind: String?
     /// A runner card's label, its container's key (unique per daemon) and the job it runs.
     var runner: String?
@@ -209,6 +212,14 @@ struct WatcherBoard: Equatable, Sendable {
     static let capacity = 24
     /// Most a session's Stop may bring.
     static let tasksPerStop = 20
+    /// A running turn card with no word for this long has lost touch (the Antigravity CLI's sooner: its
+    /// finish is inferred, so a quiet one is more likely gone). One that lost touch goes `turnFadeAfter` later.
+    static let turnWindow: TimeInterval = 60 * 60
+    static let antigravityTurnWindow: TimeInterval = 10 * 60
+    /// A finished turn card stays this long, then fades; a lost one is removed this long after it lost touch.
+    static let turnFadeAfter: TimeInterval = 60
+    /// Longest turn a card believes; a longer or negative duration leaves the card's start as it was.
+    static let maxTurn: TimeInterval = 30 * 86_400
 
     private(set) var watchers: [Watcher] = []
 
@@ -218,7 +229,21 @@ struct WatcherBoard: Equatable, Sendable {
         case .agent: agentWindow
         case .automatic: automaticWindow
         case .runner: nil
+        case .turn: turnWindow
         }
+    }
+
+    /// A watcher's own window: a turn card's depends on its agent.
+    static func window(of w: Watcher) -> TimeInterval? {
+        guard w.source == .turn else { return window(w.source) }
+        return w.kind == AgentSource.antigravity.rawValue ? antigravityTurnWindow : turnWindow
+    }
+
+    static func fade(of w: Watcher) -> TimeInterval { w.source == .turn ? turnFadeAfter : fadeAfter }
+
+    /// When a turn card lost touch (kept in `ended`); nil for any other card or state.
+    private static func lostTurn(_ w: Watcher) -> Date? {
+        w.source == .turn && w.state == .lostTouch ? w.ended : nil
     }
 
     static func agentID(_ id: String) -> String { "a:\(id)" }
@@ -305,12 +330,15 @@ struct WatcherBoard: Equatable, Sendable {
     mutating func tick(now: Date) -> Bool {
         let before = watchers
         watchers.removeAll { w in
+            if let lost = Self.lostTurn(w) { return now.timeIntervalSince(lost) >= Self.turnFadeAfter }
             guard w.state.fades, let ended = w.ended else { return false }
-            return now.timeIntervalSince(ended) >= Self.fadeAfter
+            return now.timeIntervalSince(ended) >= Self.fade(of: w)
         }
         for i in watchers.indices where watchers[i].state == .running || watchers[i].state == .waiting {
-            if let window = Self.window(watchers[i].source), now.timeIntervalSince(watchers[i].touched) > window {
+            if let window = Self.window(of: watchers[i]), now.timeIntervalSince(watchers[i].touched) > window {
                 watchers[i].state = .lostTouch
+                // A turn card keeps when it lost touch: it leaves a minute later (nothing else ends it).
+                if watchers[i].source == .turn { watchers[i].ended = now }
             }
         }
         return watchers != before
@@ -319,8 +347,9 @@ struct WatcherBoard: Equatable, Sendable {
     /// The next moment `tick` would change something, nil when nothing waits on the clock.
     func nextChange() -> Date? {
         watchers.compactMap { w -> Date? in
-            if w.state.fades, let ended = w.ended { return ended.addingTimeInterval(Self.fadeAfter) }
-            if w.state == .running || w.state == .waiting, let window = Self.window(w.source) {
+            if let lost = Self.lostTurn(w) { return lost.addingTimeInterval(Self.turnFadeAfter) }
+            if w.state.fades, let ended = w.ended { return ended.addingTimeInterval(Self.fade(of: w)) }
+            if w.state == .running || w.state == .waiting, let window = Self.window(of: w) {
                 return w.touched.addingTimeInterval(window + 1)
             }
             return nil
@@ -385,6 +414,67 @@ struct WatcherBoard: Equatable, Sendable {
         }
     }
 
+    // MARK: Turn cards (agent notifications, 2.47.0)
+
+    static func turnID(_ agent: AgentSource, session: String) -> String { "t:\(agent.rawValue):\(session)" }
+
+    /// An agent's turn moved. Started puts up a running card, or, for a session whose card still runs, waits or
+    /// lost touch, refreshes it (the watcher's keep-alive, decision D6): heard from now, its start kept. Waiting
+    /// marks it. Finished and stopped end it with the turn's own length when that can be believed. A card that
+    /// isn't there is made, so a turn already running when Sanduhr started still shows its end. The idle reminder
+    /// is never a card. True when the board changed.
+    @discardableResult
+    mutating func applyTurn(_ e: AgentTurnEvent, now: Date) -> Bool {
+        guard e.kind != .idle else { return false }
+        let before = watchers
+        let id = Self.turnID(e.agent, session: e.session)
+        let i = watchers.firstIndex { $0.id == id }
+        let old = i.map { watchers[$0] }
+        var card: Watcher
+        switch e.kind {
+        case .started:
+            if var open = old, !open.state.isEnded {
+                if open.state == .lostTouch { open.state = .running; open.ended = nil }
+                open.touched = now
+                card = open
+            } else {
+                card = turnCard(id, e, state: .running, started: min(max(e.at, now - Self.turnWindow), now), now: now)
+            }
+        case .waiting:
+            card = turnCard(id, e, state: .waiting, started: old?.started ?? now, now: now)
+        default:
+            card = turnCard(id, e, state: .finished, started: Self.start(of: e.duration, now: now) ?? old?.started ?? now,
+                            now: now)
+            card.ended = now
+            card.note = e.kind == .stopped ? "stopped" : nil
+        }
+        if e.project == nil, let old { card.title = old.title }
+        if let i { watchers[i] = card } else { watchers.append(card) }
+        trim()
+        return watchers != before
+    }
+
+    private func turnCard(_ id: String, _ e: AgentTurnEvent, state: WatcherState, started: Date, now: Date) -> Watcher {
+        Watcher(id: id, source: .turn,
+                title: WatcherLimits.line(AgentBanner.cardTitle(e.agent, project: e.project), cap: WatcherLimits.title) ?? "",
+                short: e.agent.shortName, link: nil, total: nil, done: nil, note: nil, state: state,
+                started: started, touched: now, ended: nil, session: e.session, kind: e.agent.rawValue)
+    }
+
+    /// When a turn of `duration` ending `now` started; nil for no duration, a negative or endless one.
+    private static func start(of duration: TimeInterval?, now: Date) -> Date? {
+        guard let d = duration, d.isFinite, d >= 0, d <= maxTurn else { return nil }
+        return now.addingTimeInterval(-d)
+    }
+
+    /// Drops one agent's turn cards (its source or its notifications went off). True when a card went.
+    @discardableResult
+    mutating func clearTurns(_ agent: AgentSource) -> Bool {
+        let before = watchers.count
+        watchers.removeAll { $0.source == .turn && $0.kind == agent.rawValue }
+        return watchers.count != before
+    }
+
     mutating func dismiss(_ id: String) { watchers.removeAll { $0.id == id } }
 
     mutating func dismissAll() { watchers.removeAll() }
@@ -402,10 +492,11 @@ struct WatcherBoard: Equatable, Sendable {
         }
     }
 
-    /// What the notch and the Desk show: the ordered watchers, less the work ones and the runners'
-    /// in demo mode (a runner's name can name a private repo).
+    /// What the notch and the Desk show: the ordered watchers, less the work ones, the runners' and
+    /// the turn cards in demo mode (a runner's name can name a private repo, a turn's project a real
+    /// folder).
     static func shown(_ ordered: [Watcher], demo: Bool) -> [Watcher] {
-        demo ? ordered.filter { !$0.work && $0.source != .runner } : ordered
+        demo ? ordered.filter { !$0.work && $0.source != .runner && $0.source != .turn } : ordered
     }
 
     /// Past capacity, the least urgent and oldest go first.
