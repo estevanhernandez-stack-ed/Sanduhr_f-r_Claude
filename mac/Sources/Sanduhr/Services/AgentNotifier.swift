@@ -142,6 +142,32 @@ final class AgentNotifier {
         return d
     }
 
+    /// A surface of Settings ▸ Notifications' Try it.
+    enum TrySurface: Equatable {
+        case notification
+        case glowFinished
+        case glowWaiting
+        case card
+    }
+
+    /// The made-up session every sample carries.
+    static let trySession = "try-it"
+
+    /// A sample through one real surface, whatever the switches, the source, the quiet hours, the front app and the
+    /// limiter say: Try it shows what the switch would do. The sample is a made-up Claude Code turn ("your project",
+    /// 4m 12s); it posts no Darwin name and reads no file. A surface that throws is logged, as in `handle`.
+    func tryIt(_ surface: TrySurface) {
+        let waiting = surface == .glowWaiting
+        let e = AgentTurnEvent(agent: .claude, kind: waiting ? .waiting : .finished, project: "your project",
+                               session: Self.trySession, at: clock(), duration: waiting ? nil : 252)
+        switch surface {
+        case .notification: attempt("banner") { try banner(AgentBanner(e)) }
+        case .glowFinished: attempt("glow") { try glow(color(e.agent)) }
+        case .glowWaiting: attempt("glow") { try glow(nil) }
+        case .card: attempt("card") { try card(e) }
+        }
+    }
+
     /// The agent was switched off: its sessions start over.
     func forget(_ agent: AgentSource) {
         lastEnd = lastEnd.filter { $0.key.agent != agent }

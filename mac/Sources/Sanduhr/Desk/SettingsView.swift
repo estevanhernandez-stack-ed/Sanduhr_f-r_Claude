@@ -1347,18 +1347,22 @@ private struct NotchGlowSection: View {
         }
     }
 
-    /// Claude Code's events (item 51), fed by the Claude Code glow hook.
+    /// The agents' events (item 51; widened from Claude Code in 2.47.0): the same switches Settings, Notifications
+    /// shows. Claude Code's need its hook in a folder; Codex's and Antigravity's finishes need their Sources on.
     @ViewBuilder private var claudeRows: some View {
-        Toggle("When Claude Code is waiting on you", isOn: $claudeWaiting)
-        Toggle("When Claude Code finishes", isOn: $claudeDone)
-        Toggle("Not while a terminal is in front", isOn: $skipTerminal)
+        Toggle("When an agent is waiting on you", isOn: $claudeWaiting)
+        Toggle("When an agent finishes", isOn: $claudeDone)
+        Toggle("Not while the agent's app is in front", isOn: $skipTerminal)
             .disabled(!claudeWaiting && !claudeDone)
         HStack(alignment: .firstTextBaseline) {
-            Text("The two Claude Code rows need the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. Claude Code tells Sanduhr only that it waits or finished, nothing about the conversation.")
+            Text("The two agent rows are the same switches as on Notifications. Waiting needs the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. An agent tells Sanduhr only that it waits or finished, nothing about the conversation.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
+            VStack(alignment: .trailing, spacing: 4) {
+                SettingsLinkButton(.notifications)
+                SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)
+            }
         }
         // The 20-second cap, the terminals it skips and the notchless top-center glow are in the guide.
         Link("Learn more", destination: AboutLinks.claudeCodeGuide)

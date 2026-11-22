@@ -24,12 +24,12 @@ private func snapshot(_ d: UserDefaults) -> [String: String] {
 
 @Suite("Settings v2 pages")
 struct SettingsPagesTests {
-    @Test func seventeenPagesInFiveGroups() {
-        #expect(SettingsSection.allCases.count == 20)
-        #expect(SettingsSection.groups.map(\.sections.count) == [4, 10, 2, 2, 2])
+    @Test func twentyOnePagesInFiveGroups() {
+        #expect(SettingsSection.allCases.count == 21)
+        #expect(SettingsSection.groups.map(\.sections.count) == [5, 10, 2, 2, 2])
         #expect(SettingsSection.groups.flatMap(\.sections) == SettingsSection.allCases)
         #expect(SettingsSection.allCases.map(\.title) == [
-            "General", "Accounts", "Usage", "Alerts",
+            "General", "Accounts", "Usage", "Alerts", "Notifications",
             "Desk", "Desk Look", "Message", "Notch", "Lock Screen", "Widgets", "Now Playing", "Weather", "Watchers", "Drawers",
             "Claude Code", "Mods & Config", "Widget", "Themes", "Updates", "About",
         ])
@@ -37,7 +37,7 @@ struct SettingsPagesTests {
 
     @Test func rawValuesThatNamePagesAreKept() {
         for raw in ["general", "alerts", "credentials", "usage", "deskLook", "message", "notch", "nowPlaying", "weather",
-                    "themes", "updates", "about", "integrations", "mods", "deskLayout", "widgetLook", "watchers", "lockScreen", "widgets", "drawers"] {
+                    "themes", "updates", "about", "integrations", "mods", "deskLayout", "widgetLook", "watchers", "lockScreen", "widgets", "drawers", "notifications"] {
             #expect(SettingsSection(rawValue: raw) != nil, "\(raw)")
             #expect(SettingsSection.resolve(raw)?.anchor == nil, "\(raw)")
         }

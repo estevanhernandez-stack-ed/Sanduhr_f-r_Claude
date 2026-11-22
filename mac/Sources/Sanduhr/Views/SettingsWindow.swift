@@ -10,7 +10,7 @@ import SwiftUI
 /// `usage` is Usage, `integrations` is Claude Code, `mods` is Mods & Config, `deskLayout` is Desk
 /// and `widgetLook` is Widget. The two retired pages parse as aliases (`resolve`).
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case general, credentials, usage, alerts
+    case general, credentials, usage, alerts, notifications
     case deskLayout, deskLook, message, notch, lockScreen, widgets, nowPlaying, weather, watchers, drawers
     case integrations, mods
     case widgetLook, themes
@@ -24,6 +24,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "Accounts"
         case .usage: "Usage"
         case .alerts: "Alerts"
+        case .notifications: "Notifications"
         case .deskLayout: "Desk"
         case .deskLook: "Desk Look"
         case .message: "Message"
@@ -49,6 +50,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .credentials: "person.2"
         case .usage: "chart.bar.xaxis"
         case .alerts: "bell"
+        case .notifications: "bell.badge"
         case .deskLayout: "rectangle.3.group"
         case .deskLook: "paintbrush"
         case .message: "text.quote"
@@ -70,7 +72,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     /// Sidebar groups: a header (nil for the first) and its pages.
     static let groups: [(header: String?, sections: [SettingsSection])] = [
-        (nil, [.general, .credentials, .usage, .alerts]),
+        (nil, [.general, .credentials, .usage, .alerts, .notifications]),
         ("Desktop", [.deskLayout, .deskLook, .message, .notch, .lockScreen, .widgets, .nowPlaying, .weather, .watchers, .drawers]),
         ("Claude Code", [.integrations, .mods]),
         ("Widget", [.widgetLook, .themes]),
@@ -406,6 +408,7 @@ struct SettingsRoot: View {
         case .credentials: AccountsSettings(vm: vm, navigation: navigation).settingsViewport()
         case .usage: UsageSettings(vm: vm, navigation: navigation, theme: vm.theme.palette).settingsViewport()
         case .integrations: IntegrationsSettings(vm: vm, navigation: navigation).settingsViewport()
+        case .notifications: NotificationsSettings(vm: vm).settingsViewport()
         // Mods & Config draws its summary card itself, under More (2026-10-17).
         case .mods: ModsSettings(vm: vm, model: navigation.modsPage).settingsViewport()
         case .widgetLook:

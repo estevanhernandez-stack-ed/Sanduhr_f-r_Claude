@@ -56,33 +56,4 @@ enum AgentNotificationsWiring {
                            legacyGlow: (ClaudeCodeEvent) -> Void) {
         if route(event, posted: posted()) == .legacyGlow { legacyGlow(event) }
     }
-
-    // MARK: Settings, until the Notifications page lands
-
-    static let bannerKey = "agentNotifications.banner"
-    static let cardKey = "agentNotifications.card"
-    static let thresholdKey = "agentNotifications.threshold"
-    static let idleKey = "agentNotifications.idle"
-
-    /// The rules' settings from the keys that exist today: the three Claude Code glow switches in the Desk
-    /// defaults, the new keys in the standard defaults at the plan's defaults, and Alerts' quiet hours.
-    /// TEMPORARY: Task 7 replaces this with `AgentNotificationSettings.load` (and the idle-on-upgrade
-    /// migration); AppDelegate calls only this one function, so the swap is one line.
-    static func interimSettings(desk: DefaultsStore, standard: DefaultsStore) -> NotificationSettings {
-        var s = NotificationSettings()
-        s.banner = standard.object(forKey: bannerKey) as? Bool ?? true
-        s.card = standard.object(forKey: cardKey) as? Bool ?? true
-        s.idle = standard.object(forKey: idleKey) as? Bool ?? false
-        if let seconds = (standard.object(forKey: thresholdKey) as? NSNumber)?.doubleValue,
-           NotificationSettings.thresholds.contains(seconds) {
-            s.threshold = seconds
-        }
-        let glow = NotchGlowSwitches(desk)
-        s.glowFinished = glow.claudeDone
-        s.glowWaiting = glow.claudeWaiting
-        s.skipInFront = glow.claudeSkipTerminal
-        let alerts = AlertSettings(standard)
-        s.quiet = (alerts.quietEnabled, alerts.quietStart, alerts.quietEnd)
-        return s
-    }
 }

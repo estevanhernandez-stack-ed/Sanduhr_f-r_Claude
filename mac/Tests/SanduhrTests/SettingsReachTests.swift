@@ -87,8 +87,8 @@ struct SettingsSearchTests {
     @Test func groupedListsEachPageOnceBestFirst() {
         let groups = SettingsSearch.grouped(SettingsSearch.hits("glow"))
         let pages = groups.map(\.page)
-        // Title matches first, in sidebar order; Desk Look matches only by a synonym, so it is last.
-        #expect(pages == [.notch, .watchers, .integrations, .deskLook])
+        // Title matches first, in sidebar order; Notifications and Desk Look match only by a synonym, so they follow.
+        #expect(pages == [.notch, .watchers, .integrations, .notifications, .deskLook])
         #expect(Set(pages).count == pages.count)
         #expect(groups.first?.entries.first == SettingsSearch.hits("glow").first?.entry)
         #expect(groups.first { $0.page == .notch }?.entries.map(\.title) == [SettingsNames.notchGlow])
