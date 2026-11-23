@@ -14,6 +14,10 @@ struct CodexWidgetReading: Equatable {
     var asOf: Date?
     var freshTiers: Set<Tier> = []
     var emptyState: CodexUsageService.EmptyState?
+    /// `history.@codex.json`'s recent window, per tier (`CodexRecorder.onSparklines`): what the cards' sparklines draw.
+    var history: HistoryStore.History = [:]
+    /// Meter history is on for `@codex`; off, the cards draw no sparkline whatever is on file.
+    var historyOn = true
 
     static let none = CodexWidgetReading()
 }
@@ -46,7 +50,9 @@ extension WidgetSourcesInput {
             claudeOn: vm.usageOn || vm.demo, claudeUsage: vm.shownUsage, hidden: vm.hiddenTiers,
             codexOn: sources.codexOn,
             codex: CodexWidgetReading(usage: codex.codexUsage, asOf: codex.asOf, freshTiers: codex.freshTiers,
-                                      emptyState: codex.emptyState),
+                                      emptyState: codex.emptyState, history: codex.sparklines,
+                                      historyOn: MeterHistory.isOn(CodexRecorder.historyAccount,
+                                                                   in: KeychainStore.accounts.defaults)),
             primary: sources.primary, settings: sources.settings, collapsed: sources.collapsed,
             compact: vm.compact, demo: vm.demo, now: now)
     }
@@ -60,6 +66,9 @@ struct WidgetSourceCard: Equatable {
     var stale = false
     var label: String
     var spokenLabel: String
+    /// The sparkline's points, oldest first. Codex's, from `history.@codex.json`; empty for Claude's (their
+    /// sparklines come through `WidgetCards.live`) and when Meter history is off.
+    var history: [Double] = []
 }
 
 struct WidgetSourceHeader: Equatable {
@@ -168,12 +177,19 @@ enum WidgetSources {
         var cards = windows.compactMap { w -> WidgetSourceCard? in
             guard let t = usage.tiers[w.tier], t.utilization != nil else { return nil }
             return WidgetSourceCard(tier: w.tier, usage: t, stale: !codex.freshTiers.contains(w.tier),
-                                    label: w.window.label, spokenLabel: "Codex " + w.window.markWord)
+                                    label: w.window.label, spokenLabel: "Codex " + w.window.markWord,
+                                    history: sparkline(codex, w.tier))
         }
         if compact, let top = cards.max(by: { ($0.usage.utilization ?? 0) < ($1.usage.utilization ?? 0) }) {
             cards = [top]
         }
         return cards.isEmpty ? .empty(noLimitsLine) : .cards(cards)
+    }
+
+    /// A card's sparkline points: the last `HistoryStore.sparklinePoints` of the tier's history, none while off.
+    private static func sparkline(_ codex: CodexWidgetReading, _ tier: Tier) -> [Double] {
+        guard codex.historyOn else { return [] }
+        return HistoryStore.sparklines(codex.history)[tier.rawValue]?.map(\.v) ?? []
     }
 
     static func emptyLine(_ state: CodexUsageService.EmptyState?) -> String {
@@ -236,9 +252,11 @@ enum WidgetSources {
 
     // MARK: Demo
 
-    /// Demo mode's Codex: the sample numbers, every window fresh, as of now. Never reads `~/.codex`.
+    /// Demo mode's Codex: the sample numbers and a made-up history, every window fresh, as of now. Never
+    /// reads `~/.codex` or `history.@codex.json`.
     static func demoReading(now: Date) -> CodexWidgetReading {
-        CodexWidgetReading(usage: DemoMode.codexUsage(now: now), asOf: now, freshTiers: [.fiveHour, .sevenDay])
+        CodexWidgetReading(usage: DemoMode.codexUsage(now: now), asOf: now, freshTiers: [.fiveHour, .sevenDay],
+                           history: DemoMode.codexHistory(now: now))
     }
 }
 

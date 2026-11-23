@@ -24,8 +24,20 @@ private let claudeSamples: [UsageResponse?] = [
 private let codexUsage = UsageResponse(tiers: [.fiveHour: tier(30, in: 7200), .sevenDay: tier(70, in: 3 * 86_400)])
 
 private func codex(_ usage: UsageResponse? = codexUsage, fresh: Set<Tier> = [.fiveHour, .sevenDay],
-                   asOf: Date? = now, empty: CodexUsageService.EmptyState? = nil) -> CodexWidgetReading {
-    CodexWidgetReading(usage: usage, asOf: asOf, freshTiers: fresh, emptyState: empty)
+                   asOf: Date? = now, empty: CodexUsageService.EmptyState? = nil,
+                   history: HistoryStore.History = [:], historyOn: Bool = true) -> CodexWidgetReading {
+    CodexWidgetReading(usage: usage, asOf: asOf, freshTiers: fresh, emptyState: empty,
+                       history: history, historyOn: historyOn)
+}
+
+/// A made-up `@codex` history: `values` per tier, an hour apart, ending at `now`.
+private func madeUpHistory(five: [Double], week: [Double]) -> HistoryStore.History {
+    func points(_ values: [Double]) -> [HistoryStore.Point] {
+        values.enumerated().map { i, v in
+            HistoryStore.Point(t: ISO8601.stamp(now.addingTimeInterval(-3600 * Double(values.count - 1 - i)), fractional: false), v: v)
+        }
+    }
+    return [Tier.fiveHour.rawValue: points(five), Tier.sevenDay.rawValue: points(week)]
 }
 
 private func input(claude: UsageResponse? = claudeSamples[3], claudeOn: Bool = true, codexOn: Bool = true,
@@ -262,5 +274,85 @@ struct WidgetSourcesDemoTests {
         let sample = DemoMode.codexUsage(now: now)
         #expect(Set(sample.tiers.keys) == [.fiveHour, .sevenDay])
         #expect(sample.tiers.values.allSatisfy { ($0.utilization ?? -1) > 0 && $0.resetsAt != nil })
+    }
+}
+
+@Suite("Widget sources: Codex sparklines")
+struct WidgetSourcesCodexSparklineTests {
+    private func cards(_ built: WidgetSourceLayout) -> [WidgetSourceCard] {
+        guard case .cards(let cards) = built.sections[1].content else { Issue.record("no cards"); return [] }
+        return cards
+    }
+
+    @Test func aCodexCardCarriesItsTiersHistoryPoints() {
+        let history = madeUpHistory(five: [10, 20, 30], week: [60, 65, 70])
+        let built = WidgetSources.build(input(codex: codex(history: history)))
+        let rows = cards(built)
+        #expect(rows.map(\.tier) == [.fiveHour, .sevenDay])
+        #expect(rows[0].history == [10, 20, 30])
+        #expect(rows[1].history == [60, 65, 70])
+    }
+
+    @Test func aSparklineKeepsTheNewestPointsOnly() {
+        let many = (0..<(HistoryStore.sparklinePoints + 10)).map(Double.init)
+        let built = WidgetSources.build(input(codex: codex(history: madeUpHistory(five: many, week: [1]))))
+        #expect(cards(built)[0].history == Array(many.suffix(HistoryStore.sparklinePoints)))
+    }
+
+    @Test func aTierWithNoHistoryHasNoPoints() {
+        let built = WidgetSources.build(input(codex: codex(history: madeUpHistory(five: [10, 20], week: []))))
+        #expect(cards(built)[0].history == [10, 20])
+        #expect(cards(built)[1].history.isEmpty)
+    }
+
+    @Test func meterHistoryOffForCodexDrawsNoSparkline() {
+        let history = madeUpHistory(five: [10, 20, 30], week: [60, 65, 70])
+        let built = WidgetSources.build(input(codex: codex(history: history, historyOn: false)))
+        #expect(cards(built).allSatisfy { $0.history.isEmpty })
+    }
+
+    @Test func noHistoryOnFileDrawsNoSparkline() {
+        let built = WidgetSources.build(input())
+        #expect(cards(built).allSatisfy { $0.history.isEmpty })
+    }
+
+    @Test func compactKeepsTheTopCardsPoints() {
+        let history = madeUpHistory(five: [10, 20, 30], week: [60, 65, 70])
+        let built = WidgetSources.build(input(codex: codex(history: history), primary: .codex, compact: true))
+        guard case .cards(let rows)? = built.sections.first?.content else { Issue.record("no cards"); return }
+        #expect(rows.map(\.tier) == [.sevenDay])
+        #expect(rows[0].history == [60, 65, 70])
+    }
+
+    @Test func claudeCardsAreUnchangedWhateverCodexHolds() {
+        let history = madeUpHistory(five: [10, 20, 30], week: [60, 65, 70])
+        let with = WidgetSources.build(input(codex: codex(history: history)))
+        let without = WidgetSources.build(input(codex: codex()))
+        guard case .cards(let a) = with.sections[0].content, case .cards(let b) = without.sections[0].content else {
+            Issue.record("no cards"); return
+        }
+        #expect(a == b)
+        #expect(a.allSatisfy { $0.history.isEmpty })
+        #expect(with.claudeRows.map(\.usage) == without.claudeRows.map(\.usage))
+    }
+
+    @Test func demoDrawsAMadeUpCodexSparklineEvenWithNothingOnFile() {
+        let built = WidgetSources.build(input(codex: codex(nil, fresh: [], asOf: nil, empty: .notInstalled), demo: true))
+        let rows = cards(built)
+        #expect(rows.count == 2)
+        for row in rows {
+            #expect(row.history.count == HistoryStore.sparklinePoints)
+            #expect(row.history.allSatisfy { $0 >= 0 && $0 <= 100 })
+            #expect(row.history.last == DemoMode.codexUsage(now: now).tiers[row.tier]?.utilization)
+        }
+    }
+
+    @Test func theDemoCodexHistoryCoversBothWindowsAndEndsAtTheSampleNumbers() {
+        let h = DemoMode.codexHistory(now: now)
+        #expect(Set(h.keys) == [Tier.fiveHour.rawValue, Tier.sevenDay.rawValue])
+        let sample = DemoMode.codexUsage(now: now)
+        for tier in [Tier.fiveHour, .sevenDay] {
+            #expect(h[tier.rawValue]?.last?.v == sample.tiers[tier]?.utilization)
+        }
     }
 }

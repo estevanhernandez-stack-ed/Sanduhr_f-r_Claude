@@ -21,7 +21,13 @@ final class CodexRecorder {
     private let alert: (UsageResponse, Set<Tier>) -> Void
     private let forget: () -> Void
 
+    /// Called with the sparklines after each reading: the recent window of `history.@codex.json`, read once
+    /// and grown in memory like Claude's, so the widget never reads the file. Not called while Meter history
+    /// is off for `@codex`.
+    var onSparklines: ((HistoryStore.History) -> Void)?
+
     private var seeded = false
+    private var sparklines: HistoryStore.History = [:]
     private var lastAppended: Date?
     private var lastPoint: [Tier: (pct: Int, at: Date)] = [:]
     private var lastSnapshotKey: String?
@@ -81,7 +87,10 @@ final class CodexRecorder {
         guard MeterHistory.isOn(Self.historyAccount, in: defaults) else { return }
         if !seeded {
             seeded = true
-            lastAppended = newestHistoryPoint()
+            let onFile = HistoryStore.io.sync { files.load(Self.historyAccount) }
+            lastAppended = Self.newest(onFile)
+            sparklines = HistoryStore.sparklines(onFile)
+            onSparklines?(sparklines)
         }
         // The same event again (a restart, a poll with nothing new) is already on file.
         if let last = lastAppended, r.asOf <= last { return }
@@ -93,13 +102,16 @@ final class CodexRecorder {
             readings.append((tier, Double(rounded)))
             lastPoint[tier] = (rounded, r.asOf)
         }
-        HistoryStore.record(readings, account: Self.historyAccount, defaults: defaults, files: files, now: clock())
+        let now = clock()
+        if HistoryStore.record(readings, account: Self.historyAccount, defaults: defaults, files: files, now: now) {
+            sparklines = HistoryStore.sparklines(sparklines, adding: readings, at: now)
+            onSparklines?(sparklines)
+        }
         lastAppended = r.asOf
     }
 
-    private func newestHistoryPoint() -> Date? {
-        let history = HistoryStore.io.sync { files.load(Self.historyAccount) }
-        return history.values.flatMap { $0 }.compactMap { HistoryStore.date($0.t) }.max()
+    private static func newest(_ history: HistoryStore.History) -> Date? {
+        history.values.flatMap { $0 }.compactMap { HistoryStore.date($0.t) }.max()
     }
 
     // MARK: Snapshot
