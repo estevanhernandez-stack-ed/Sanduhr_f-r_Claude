@@ -1,0 +1,121 @@
+{
+  "run": "mac-followups-2-48",
+  "repo": "~/Projects/Sanduhr_f-r_Claude",
+  "base_commit": "97b44fa4445ecb5ec17e49a4f091ba464fcfaeaa",
+  "integration_branch": "cart/mac-followups-2-48",
+  "integration_worktree": "~/.cwt/sanduhr-f-r-clau-mac-followups-2-48/int",
+  "worktree_root": "~/.cwt/sanduhr-f-r-clau-mac-followups-2-48",
+  "builder_branch": "main",
+  "uncommitted_at_start": [],
+  "started_at": "2026-11-23T14:54:40.201Z",
+  "items": [
+    {
+      "n": 1,
+      "slug": "codex-sparkline",
+      "title": "codex-sparkline",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--01-codex-sparkline",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 2,
+      "slug": "codex-desk-pulse",
+      "title": "codex-desk-pulse",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--02-codex-desk-pulse",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 3,
+      "slug": "codex-combine-chip",
+      "title": "codex-combine-chip",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--03-codex-combine-chip",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && python3 -m pytest -q integrations/tests && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 4,
+      "slug": "agents-in-trends",
+      "title": "agents-in-trends",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--04-agents-in-trends",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ./build.sh --debug",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 5,
+      "slug": "claude-code-hook-name",
+      "title": "claude-code-hook-name",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--05-claude-code-hook-name",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    },
+    {
+      "n": 6,
+      "slug": "rows-2-48",
+      "title": "rows-2-48",
+      "stop_class": "go",
+      "status": "merged",
+      "branch": "cart/mac-followups-2-48--06-rows-2-48",
+      "worktree": "",
+      "on": null,
+      "checks": [
+        {
+          "attempt": 1,
+          "command": "cd mac && ./test.sh && ruby smoke/selftest.rb && python3 -m pytest -q integrations/tests",
+          "result": "pass"
+        }
+      ],
+      "reason": ""
+    }
+  ]
+}
