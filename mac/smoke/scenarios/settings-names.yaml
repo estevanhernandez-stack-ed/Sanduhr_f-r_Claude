@@ -12,7 +12,7 @@
 # Config, Widget) and gave Watchers its own page, so the buttons follow.
 name: Every Settings… button opens the page it names
 steps:
-  # Claude Code: the Claude Code glow hook's hint opens Notch; the old Layout and Integrations
+  # Claude Code: the Claude Code hook's hint opens Notch; the old Layout and Integrations
   # titles are gone everywhere.
   - do: settings
     arg: integrations

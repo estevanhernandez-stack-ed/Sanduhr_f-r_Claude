@@ -52,7 +52,7 @@ Not Installed, Another entry, and unreadable JSON get no Check: there is nothing
 - It is disabled under the same rule as the row's other buttons (`model.canRun(.mcp)`: nothing busy, a python3 found).
 - While a check runs, the folder is busy (`busy = folder`). Every button in that folder box is disabled until the
   result is in. The check takes at most 15 seconds, the probe's timeout.
-- The statusline and glow hook rows get no Check. Neither is a server Claude Code waits on, and the statusline
+- The statusline and Claude Code hook rows get no Check. Neither is a server Claude Code waits on, and the statusline
   already has its preview and Test with live data.
 
 ### What is started: the registered entry, not a recomputed one

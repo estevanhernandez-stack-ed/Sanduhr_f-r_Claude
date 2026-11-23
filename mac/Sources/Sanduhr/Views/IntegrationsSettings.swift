@@ -313,7 +313,7 @@ final class IntegrationsModel {
 
 /// Settings, Claude Code (raw value `integrations`; item 49, Settings v2 slice 2): one home for
 /// what Sanduhr installs into Claude Code folders: the MCP server, the statusline and the Claude
-/// Code glow hook, per folder, with the account each folder follows. The meters mod is a mod, so
+/// Code hook, per folder, with the account each folder follows. The meters mod is a mod, so
 /// its controls live on Mods & Config (2026-10-08); each folder shows its state in one line with
 /// the way there. Its consent points at the accounts' Share with your agents choices.
 struct IntegrationsSettings: View {
@@ -431,7 +431,7 @@ private struct IntegrationsIntro: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Claude Code").font(.headline)
-            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt, whichever account a folder is linked to; Sanduhr's meters mod draws them as bars above it, switched on Mods & Config. The Claude Code glow hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so the notch can glow. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
+            Text("The MCP server lets Claude Code ask Sanduhr about your usage, as each account's Share with your agents choice allows. The statusline shows the active account's meters under Claude Code's prompt, whichever account a folder is linked to; Sanduhr's meters mod draws them as bars above it, switched on Mods & Config. The Claude Code hook lets Claude Code tell Sanduhr when a session waits on you or finishes, so Sanduhr can notify you, show a card on the Desk and glow the notch. Each is installed per Claude Code folder: Sanduhr adds one entry to that folder's settings, keeps a backup of the file beside it, and Remove takes the entry out again. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -480,7 +480,7 @@ private struct PythonRow: View {
 private struct GlowHint: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("The Claude Code glow hook only tells Sanduhr; the glow itself is off until you turn it on in Notch, Notch glow.")
+            Text("The Claude Code hook only tells Sanduhr; the glow itself is off until you turn it on in Notch, Notch glow.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -491,7 +491,7 @@ private struct GlowHint: View {
     }
 }
 
-/// One folder: the account it follows, then its MCP server, statusline and Claude Code glow hook
+/// One folder: the account it follows, then its MCP server, statusline and Claude Code hook
 /// rows, and the meters mod's state with the way to Mods & Config.
 private struct IntegrationFolderBox: View {
     let folder: IntegrationFolderState

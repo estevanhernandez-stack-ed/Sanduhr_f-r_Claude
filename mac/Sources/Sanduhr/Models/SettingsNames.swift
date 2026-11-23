@@ -40,7 +40,7 @@ enum SettingsNames {
     /// Notch's one glow section: Sanduhr alerts, meetings, the camera light and Claude Code.
     static let notchGlow = "Notch glow"
     /// The hooks Claude Code runs to tell Sanduhr it waits or finished (IntegrationKind.hooks).
-    static let claudeCodeGlowHook = "Claude Code glow hook"
+    static let claudeCodeHook = "Claude Code hook"
     /// The Desk pieces with the Claude numbers: one line of text, and the bars.
     static let claudeMetersLine = "Claude meters (line)"
     static let claudeMetersBars = "Claude meters (bars)"
@@ -70,7 +70,7 @@ enum SettingsNames {
         (checkAppMenus, .general),
         (deskSwitch, .deskLayout), (oledCareSwitch, .deskLayout),
         (notchSwitch, .notch), (notchGlow, .notch), (cameraMicPlace, .notch),
-        (claudeCodeGlowHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
+        (claudeCodeHook, .integrations), (metersAbovePrompt, .mods), (byFolder, .mods),
         (claudeMetersLine, .deskLayout), (claudeMetersBars, .deskLayout),
         (watchersOnNotch, .watchers), (watchersOnDesk, .watchers), (ciRunnersSwitch, .watchers),
         (showWidget, .widgetLook), (checkForUpdates, .updates), (saveAndApply, .themes),
@@ -89,9 +89,10 @@ enum SettingsNames {
         ("Extend the camera notch", notchSwitch),
         ("Glow for Claude Code", notchGlow),
         ("Notch, Glow", "Notch, \(notchGlow)"),
-        ("Notch glow when Claude needs you", claudeCodeGlowHook),
-        ("notch glow hook", claudeCodeGlowHook),
-        ("notch glow for when Claude needs you", claudeCodeGlowHook),
+        ("Notch glow when Claude needs you", claudeCodeHook),
+        ("notch glow hook", claudeCodeHook),
+        ("Claude Code glow hook", claudeCodeHook),
+        ("notch glow for when Claude needs you", claudeCodeHook),
         ("Claude line", claudeMetersLine),
         ("Check Now", checkForUpdates),
         ("Save and Apply", saveAndApply),
