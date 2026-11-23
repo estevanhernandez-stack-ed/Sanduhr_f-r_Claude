@@ -33,7 +33,7 @@ struct StatuslineLookTests {
         let c = StatuslineChips(Self.inspection)
         #expect(c.chips(line: 0).map(\.name) == ["Branch", "Cost", "Model", "Context"])
         #expect(c.chips(line: 0).map(\.kind) == [.branch, .cost, .model, .context])
-        #expect(c.mineChips.map(\.name) == ["Account", "Session", "Weekly", "Weekly reset", "Context", "Model"])
+        #expect(c.mineChips.map(\.name) == ["Account", "Session", "Weekly", "Weekly reset", "Codex", "Context", "Model"])
         // An older script without kinds, and a kind it doesn't know: "Your segment".
         var other = StatuslineChips(Self.inspection)
         other.setSeparator(.none, line: 0)
