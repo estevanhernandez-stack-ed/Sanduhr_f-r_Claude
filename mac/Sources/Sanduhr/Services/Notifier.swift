@@ -165,6 +165,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         playSystemSound(sound)
     }
 
+    /// The lock screen line stopped updating (2.47.1, #356; LockLineController.checkWarning decided). A system
+    /// notice on its own path: Alerts' master switch and delivery route don't apply, the alert sound does, and
+    /// quiet hours were checked by the caller. Clicking it opens Settings, Lock Screen.
+    func lockLineStopped() {
+        let sound = AlertSettings(defaults).sound
+        post(BannerSpec(id: LockLineDaemon.warningID, title: LockLineDaemon.warningTitle,
+                        body: LockLineDaemon.warningBody, thread: nil, defaultSound: sound == AlertSound.standard))
+        playSystemSound(sound)
+    }
+
     /// Shows the widget: a click on an agent notification. AppDelegate's showPanel by default; injectable.
     var showWidget: @MainActor () -> Void = { (NSApp.delegate as? AppDelegate)?.showPanel() }
 
@@ -178,6 +188,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// alert).
     static func clickTarget(for id: String) -> ClickTarget? {
         if id.hasPrefix(AgentBanner.idPrefix) { return .widget }
+        if id == LockLineDaemon.warningID { return .settings(.lockScreen) }
         let section: SettingsSection? = id.hasPrefix(deskSuggestionPrefix) ? .message
             : id.hasPrefix(themeSuggestionPrefix) ? .themes
             : id.hasPrefix(widgetSuggestionPrefix) || id.hasPrefix(spriteMotionPrefix) ? .widgets

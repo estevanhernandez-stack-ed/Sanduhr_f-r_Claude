@@ -34,6 +34,13 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### Fixes
+
+- **The lock screen helper no longer goes missing without a word.** With **Show a line on the lock screen** on and macOS no longer registering the helper (after the Sanduhr toggle in System Settings, General, Login Items, for example), Settings, Lock Screen read "Off" while the lock screen kept an old line. It now says "The lock screen helper isn't registered, so the lock screen keeps an old line." with a **Turn it on again** button, which registers it the way the switch does and shows what macOS said if it refuses.
+- **A notification when the lock screen line stops updating.** When the switch is on and the helper has stopped or isn't registered, a notification says "The lock screen line stopped updating." about 3 minutes after launch or a wake; clicking it opens Settings, Lock Screen. It comes at most once a day, waits for Alerts' quiet hours to end, never shows in demo mode, and uses the alert sound setting. Sanduhr still never registers the helper on its own (#356).
+
 ## v2.47.0-mac — 2026-11-22
 
 ### New

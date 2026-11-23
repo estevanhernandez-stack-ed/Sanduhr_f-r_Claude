@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 import Testing
 @testable import Sanduhr
 
@@ -162,5 +163,127 @@ struct LockLineDaemonTests {
         #expect(LockLineDaemon.installProblem(E(), after: .needsApproval) == nil)
         // A refusal says what to do in Login Items rather than repeating macOS (2.39.3).
         #expect(LockLineDaemon.installProblem(E(), after: .off)?.contains("Login Items") == true)
+    }
+}
+
+/// 2.47.1 (#356): the switch on while macOS has no registration read "Off" for 19 days, and nothing
+/// said the lock screen kept an old line. The switch now takes part in the state, and a notification
+/// says when the line stops updating.
+@Suite("Lock screen helper repair")
+@MainActor
+struct LockLineRepairTests {
+    let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func everySwitchAndStatusCombination() {
+        let statuses: [SMAppServiceStatusCase] = [.enabled, .requiresApproval, .notRegistered, .notFound]
+        for s in statuses {
+            let off = LockLineDaemon.state(enabled: false, status: s.status, legacy: .notRegistered)
+            let on = LockLineDaemon.state(enabled: true, status: s.status, legacy: .notRegistered)
+            switch s {
+            case .enabled: #expect(off == .on); #expect(on == .on)
+            case .requiresApproval: #expect(off == .needsApproval); #expect(on == .needsApproval)
+            case .notRegistered: #expect(off == .off); #expect(on == .unregistered)
+            case .notFound: #expect(off == .missing); #expect(on == .missing)
+            }
+        }
+        // Not found as the legacy one too: still unregistered with the switch on.
+        #expect(LockLineDaemon.state(enabled: true, status: .notRegistered, legacy: .notFound) == .unregistered)
+        // Needs approval whatever the legacy helper or the switch says.
+        #expect(LockLineDaemon.state(enabled: true, status: .requiresApproval, legacy: .enabled) == .needsApproval)
+        #expect(LockLineDaemon.state(enabled: false, status: .requiresApproval, legacy: .enabled) == .needsApproval)
+        #expect(LockLineDaemon.State.unregistered.rawValue == "unregistered")
+    }
+
+    /// 2.33.0's label rule is unchanged: its helper still registered reads On, switch on or off.
+    @Test func theLegacyLabelRuleIsUnchanged() {
+        #expect(LockLineDaemon.state(enabled: true, status: .notRegistered, legacy: .enabled) == .on)
+        #expect(LockLineDaemon.state(enabled: false, status: .notRegistered, legacy: .enabled) == .on)
+    }
+
+    @Test func theHeartbeatStillJudgesAnEnabledHelper() {
+        let judge = LockLineDaemon.judgeAfter, age = LockLineDaemon.heartbeatMaxAge
+        let now = t0.addingTimeInterval(judge + 600)
+        #expect(LockLineDaemon.state(enabled: true, status: .enabled, legacy: .notRegistered,
+                                     heartbeat: now.addingTimeInterval(-60), watchingSince: t0, now: now) == .on)
+        #expect(LockLineDaemon.state(enabled: true, status: .enabled, legacy: .notRegistered,
+                                     heartbeat: now.addingTimeInterval(-age - 1), watchingSince: t0, now: now) == .stalled)
+        // Inside the judge window a stale heartbeat is not judged yet.
+        #expect(LockLineDaemon.state(enabled: true, status: .enabled, legacy: .notRegistered,
+                                     heartbeat: nil, watchingSince: t0, now: t0.addingTimeInterval(judge - 1)) == .on)
+        // Not registered never reads stalled: it has its own state and button.
+        #expect(LockLineDaemon.state(enabled: true, status: .notRegistered, legacy: .notRegistered,
+                                     heartbeat: nil, watchingSince: t0, now: now) == .unregistered)
+    }
+
+    @Test func theUnregisteredCaptionAndProblem() {
+        #expect(LockLineDaemon.caption(.unregistered)
+                == "The lock screen helper isn't registered, so the lock screen keeps an old line.")
+        #expect(LockLineDaemon.turnOnAgain == "Turn it on again")
+        struct E: LocalizedError { var errorDescription: String? { "The disk is full." } }
+        // A failed "Turn it on again" shows what macOS said, as the switch does.
+        #expect(LockLineDaemon.installProblem(E(), after: .unregistered) == "macOS did not install the lock screen helper: The disk is full.")
+        let eperm = NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))
+        #expect(LockLineDaemon.installProblem(eperm, after: .unregistered)?.contains("Login Items") == true)
+    }
+
+    func warn(_ state: LockLineDaemon.State, enabled: Bool = true, demo: Bool = false, quiet: Bool = false,
+              lastWarned: Date? = nil, now: Date? = nil) -> Bool {
+        LockLineDaemon.shouldWarn(state: state, enabled: enabled, demo: demo, quiet: quiet, lastWarned: lastWarned,
+                                  now: now ?? t0.addingTimeInterval(LockLineDaemon.judgeAfter), watchingSince: t0)
+    }
+
+    @Test func theWarningFiresForStalledAndUnregistered() {
+        #expect(warn(.stalled))
+        #expect(warn(.unregistered))
+        for s in [LockLineDaemon.State.on, .off, .needsApproval, .missing] { #expect(!warn(s)) }
+    }
+
+    @Test func noWarningWithTheSwitchOffOrInDemoMode() {
+        #expect(!warn(.stalled, enabled: false))
+        #expect(!warn(.unregistered, enabled: false))
+        #expect(!warn(.stalled, demo: true))
+        #expect(!warn(.unregistered, demo: true))
+    }
+
+    @Test func theWarningWaitsForTheJudgeWindow() {
+        #expect(!warn(.unregistered, now: t0.addingTimeInterval(LockLineDaemon.judgeAfter - 1)))
+        #expect(!warn(.stalled, now: t0))
+        #expect(warn(.unregistered, now: t0.addingTimeInterval(LockLineDaemon.judgeAfter)))
+    }
+
+    @Test func theWarningRepeatsAtMostOnceADay() {
+        let now = t0.addingTimeInterval(LockLineDaemon.judgeAfter)
+        #expect(!warn(.stalled, lastWarned: now.addingTimeInterval(-60), now: now))
+        #expect(!warn(.stalled, lastWarned: now.addingTimeInterval(-LockLineDaemon.warnEvery + 1), now: now))
+        #expect(warn(.stalled, lastWarned: now.addingTimeInterval(-LockLineDaemon.warnEvery), now: now))
+        #expect(LockLineDaemon.warnEvery == 24 * 60 * 60)
+    }
+
+    /// Quiet hours hold it, as they hold agent notifications; it is not recorded, so the first check
+    /// after they end fires it.
+    @Test func quietHoursHoldTheWarning() {
+        #expect(!warn(.stalled, quiet: true))
+        #expect(warn(.stalled, quiet: false))
+    }
+
+    @Test func theWarningsWordsAndClick() {
+        #expect(LockLineDaemon.warningID == "lockline-stopped")
+        #expect(LockLineDaemon.warningTitle == "The lock screen line stopped updating.")
+        #expect(LockLineDaemon.warningBody.hasSuffix("."))
+        #expect(Notifier.clickTarget(for: LockLineDaemon.warningID) == .settings(.lockScreen))
+        #expect(LockLineKeys.warnedAt == "lockLineWarnedAt")
+    }
+}
+
+/// SMAppService.Status's cases, iterable for the combination test.
+enum SMAppServiceStatusCase: CaseIterable {
+    case enabled, requiresApproval, notRegistered, notFound
+    var status: SMAppService.Status {
+        switch self {
+        case .enabled: .enabled
+        case .requiresApproval: .requiresApproval
+        case .notRegistered: .notRegistered
+        case .notFound: .notFound
+        }
     }
 }

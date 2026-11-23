@@ -72,8 +72,9 @@ private struct LockLinePreviewSection: View {
     }
 }
 
-/// The switch and the helper's state under it: installed, waiting for macOS's OK, or off, and
-/// what macOS said when it refused.
+/// The switch and the helper's state under it: installed, waiting for macOS's OK, stopped, not
+/// registered while the switch is on (2.47.1, with **Turn it on again**), or off, and what macOS said
+/// when it refused.
 private struct LockLineSwitchSection: View {
     @Binding var enabled: Bool
     @State private var state = LockLineDaemon.state
@@ -88,6 +89,9 @@ private struct LockLineSwitchSection: View {
             Text(removing ? LockLineDaemon.removingCaption : LockLineDaemon.caption(state))
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if state == .unregistered {
+                Button(LockLineDaemon.turnOnAgain) { install() }
+            }
             if state == .needsApproval || state == .stalled || problem != nil {
                 Button("Open Login Items…") { LockLineDaemon.openLoginItems() }
             }
@@ -106,15 +110,7 @@ private struct LockLineSwitchSection: View {
     private func apply(_ on: Bool) {
         problem = nil
         if on {
-            LockLineController.shared.refresh(force: true)
-            Task { @MainActor in
-                do { try await LockLineDaemon.install() } catch {
-                    // register() also throws when macOS wants the Login Items OK first; the state is
-                    // the truth, so only a helper that is neither on nor waiting for an OK failed.
-                    problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
-                }
-                state = LockLineDaemon.state
-            }
+            install()
         } else {
             let shown = LockLineDaemon.currentLoginText() ?? ""
             let wasOn = state == .on
@@ -142,6 +138,21 @@ private struct LockLineSwitchSection: View {
                 state = LockLineDaemon.state
                 if !removed { problem = LockLineDaemon.stillUp }
             }
+        }
+    }
+
+    /// The switch turning on and **Turn it on again** both come here: one install path, one way of
+    /// showing what macOS said.
+    private func install() {
+        problem = nil
+        LockLineController.shared.refresh(force: true)
+        Task { @MainActor in
+            do { try await LockLineDaemon.install() } catch {
+                // register() also throws when macOS wants the Login Items OK first; the state is
+                // the truth, so only a helper that is neither on nor waiting for an OK failed.
+                problem = LockLineDaemon.installProblem(error, after: LockLineDaemon.state)
+            }
+            state = LockLineDaemon.state
         }
     }
 }

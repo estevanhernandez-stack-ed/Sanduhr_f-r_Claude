@@ -2206,6 +2206,14 @@ release and `com.626labs.sanduhr.lockscreen.dev` for a dev build.
     switch on: the heartbeat is fresh again, `last exit code = 0`, and `LoginwindowText` matches
     `lock-line.txt`. Note whether the Login Items toggle alone, before the switch, already brought
     the helper back.
+11. On but not registered (2.47.1, #356): with the switch on and the helper running, switch Sanduhr
+    off and on under System Settings, General, Login Items, Allow in the Background. Settings, Lock
+    Screen reads "The lock screen helper isn't registered, so the lock screen keeps an old line." with
+    **Turn it on again**, and `state.yaml` `lock_line.helper` is `unregistered`. Wait 3 minutes (or
+    relaunch and wait 3): one notification, "The lock screen line stopped updating."; clicking it
+    opens Settings, Lock Screen. It does not come again within 24 hours, nor in quiet hours or demo
+    mode. Press **Turn it on again**: the helper registers (approve any prompt), the caption says On,
+    and the heartbeat is fresh within a minute.
 
 ## 53. Plan label (2.34.0)
 

@@ -99,6 +99,8 @@ enum LockLineKeys {
     static let usage = "lockLineUsage"
     static let reset = "lockLineReset"
     static let waiting = "lockLineWaiting"
+    /// When the "stopped updating" notification last went out (2.47.1): a date, nothing else.
+    static let warnedAt = "lockLineWarnedAt"
 
     static func slots(in d: UserDefaults = .desk) -> LockLine.Slots {
         LockLine.Slots(usage: d.object(forKey: usage) as? Bool ?? true,
@@ -129,6 +131,7 @@ final class LockLineController {
         ws.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
         refresh()
         sweepHelper()
+        checkWarning()
     }
 
     /// A sleeping Mac runs no helper: the watch for a stalled one starts again on wake. A stalled
@@ -136,6 +139,24 @@ final class LockLineController {
     /// background-item OK in 2.39.2, which only the user can give back.
     @objc private func didWake() {
         LockLineDaemon.watchingSince = Date()
+        checkWarning()
+    }
+
+    /// Posts "The lock screen line stopped updating." when `LockLineDaemon.shouldWarn` says so, and
+    /// records when (2.47.1, #356). Never registers anything.
+    func checkWarning(now: Date = Date()) {
+        guard let vm = viewModel else { return }
+        let d = UserDefaults.desk
+        let enabled = d.bool(forKey: LockLineKeys.on)
+        // Off or demo: nothing to say, and no need to ask macOS.
+        guard enabled, !vm.demo else { return }
+        let alerts = AlertSettings(UserDefaults.standard)
+        let quiet = alerts.quietEnabled && AlertRules.isQuiet(now, start: alerts.quietStart, end: alerts.quietEnd)
+        guard LockLineDaemon.shouldWarn(state: LockLineDaemon.state, enabled: enabled, demo: vm.demo, quiet: quiet,
+                                        lastWarned: d.object(forKey: LockLineKeys.warnedAt) as? Date,
+                                        now: now, watchingSince: LockLineDaemon.watchingSince) else { return }
+        d.set(now, forKey: LockLineKeys.warnedAt)
+        Notifier.shared.lockLineStopped()
     }
 
     /// A helper registered while the switch is off (a reset, a crash mid-turn-off, defaults
@@ -188,7 +209,7 @@ final class LockLineController {
     private func startTimer() {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: LockLineWriter.refreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor in self?.refresh(); self?.checkWarning() }
         }
     }
 
