@@ -165,8 +165,10 @@ enum AlertRules {
 
         guard !alerts.isEmpty else { return AlertOutcome() }
         let quiet = s.quietEnabled && isQuiet(now, start: s.quietStart, end: s.quietEnd, calendar: calendar)
-        // The Desk's meters are Claude's: another source's alert is a banner, never a pulse on them.
-        let route = route(s.delivery, deskRunning: deskRunning && source == .claude, quiet: quiet)
+        // `deskRunning` is the caller's "the Desk has a piece this source's alert can pulse" (Notifier asks
+        // DeskController.canPulse): Claude's pieces whenever the Desk runs, Codex's only where a piece shows
+        // Codex. Without one a Desk-only alert falls back to a banner, like Desk off.
+        let route = route(s.delivery, deskRunning: deskRunning, quiet: quiet)
         return AlertOutcome(alerts: alerts, banner: route.banner, pulse: route.pulse, quiet: quiet)
     }
 

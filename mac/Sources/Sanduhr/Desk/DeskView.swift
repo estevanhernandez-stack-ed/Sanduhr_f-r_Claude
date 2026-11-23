@@ -473,7 +473,7 @@ struct DeskPiece: View {
                     ForEach(model.meters) { row in
                         MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
                             .onDeskFrame(model) { $0.meterRowFrames[row.tier] = $1 }
-                            .deskPulse(model.pulses[row.tier] ?? 0, ink: ink, size: size)
+                            .deskPulse(DeskPulses.trigger(model.pulses, drawn: .claude, row: row), ink: ink, size: size)
                     }
                 } else {
                     styledMeters(size: size)

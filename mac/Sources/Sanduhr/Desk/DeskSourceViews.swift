@@ -179,6 +179,7 @@ struct DeskSourceMeters: View {
                 MeterRow(row: row, ink: ink, font: font, size: size, width: timeSize * 3.2, alignment: alignment)
                     .sourceStale(row.stale)
                     .modifier(DeskSourceRowFrame(model: model, tier: isCodex ? nil : row.tier))
+                    .deskPulse(DeskPulses.trigger(model.pulses, drawn: drawn, row: row), ink: ink, size: size)
             }
         } else {
             DeskStyledGauges(gauges: DeskMeterStyleModel.gauges(rows), style: style, ink: ink, font: font, size: size,

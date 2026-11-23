@@ -330,9 +330,9 @@ final class DeskModel {
     var desktopOn = true
     /// Arrange mode (item 60): the layout being edited on the desktop, nil-session outside it.
     let arrange = DeskArrangeMode()
-    /// Alert pulses so far, per limit (Settings, Alerts, Where alerts show). A meter row pulses
-    /// when its count goes up.
-    var pulses: [Tier: Int] = [:]
+    /// Alert pulses so far, per source and limit (Settings, Alerts, Where alerts show). A meter row pulses
+    /// when the count it reads goes up (`DeskPulses.trigger`): a Claude row on Claude's, a Codex row on Codex's.
+    var pulses: [DeskPulseKey: Int] = [:]
     /// Every pulse so far, whatever the limit; the notch island pulses when it goes up.
     var pulseCount = 0
 
@@ -779,11 +779,24 @@ final class DeskModel {
         if gauges != claudeGauges { claudeGauges = gauges }
     }
 
-    /// An alert chose the Desk: pulse these limits' meters once. `pulseCount` counts every pulse;
-    /// the notch glow that goes with it is fired by `DeskController.pulse`.
-    func pulse(_ tiers: Set<Tier>) {
-        for tier in tiers { pulses[tier, default: 0] += 1 }
+    /// An alert chose the Desk: pulse these limits' meters once, for the source that alerted (Claude's
+    /// unless told). `pulseCount` counts every pulse; the notch glow that goes with it is fired by
+    /// `DeskController.pulse`.
+    func pulse(_ tiers: Set<Tier>, source: AgentSource = .claude) {
+        for tier in tiers { pulses[DeskPulseKey(source: source, tier: tier), default: 0] += 1 }
         pulseCount += 1
+    }
+
+    /// Whether the Desk has a meter piece that `source`'s alert can light, for the layout `saved`: Claude's
+    /// alerts always pulse where the Desk runs (as they always did); another source's need a meters piece that
+    /// shows it (a Codex piece, or a combined piece with a joined row). False means an alert for it has nowhere
+    /// to pulse, so it stays a banner.
+    @MainActor func canPulse(_ source: AgentSource, saved: String) -> Bool {
+        guard source != .claude else { return true }
+        return drawnArrangement(saved: saved).shown().contains { p in
+            p.widget == "meters"
+                && DeskPulses.shows(source, drawn: drawn(p.source), codexRows: codexView.rows, combinedRows: combinedView.rows)
+        }
     }
 
     /// Every interactive element a Desk window draws, with the frame it reported there (.zero when
