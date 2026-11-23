@@ -202,6 +202,17 @@ struct CodexUsageServiceTests {
         #expect(svc.codexUsage == nil && svc.asOf == nil && svc.freshness == nil && svc.emptyState == nil)
     }
 
+    @Test func sparklinesAreHeldForTheWidgetAndClearedOnStop() throws {
+        try rollout(event(at: asOf, five: 40, week: 10))
+        let svc = make()
+        svc.update(on: true)
+        let h: HistoryStore.History = [Tier.fiveHour.rawValue: [HistoryStore.Point(t: ISO8601.stamp(asOf), v: 40)]]
+        svc.setSparklines(h)
+        #expect(svc.sparklines == h)
+        svc.update(on: false)
+        #expect(svc.sparklines.isEmpty)
+    }
+
     @Test func aTickAfterStopDoesNoIO() throws {
         try rollout(event(at: asOf, five: 40, week: 10))
         let ticker = FakeTicker(), spy = SpyCodexFS(), calls = Box(0)

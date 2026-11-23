@@ -186,6 +186,41 @@ struct CodexRecorderTests {
         #expect(exists(snapshotURL))
     }
 
+    // MARK: Sparklines
+
+    @Test func theRecorderHandsTheWidgetItsSparklinePoints() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var seen: [HistoryStore.History] = []
+        let rec = make()
+        rec.onSparklines = { seen.append($0) }
+        rec.record(publication(five: 40, week: 12))
+        rec.record(publication(five: 45, week: 12, at: asOf.addingTimeInterval(120)))
+        #expect(seen.last?[Tier.fiveHour.rawValue]?.map(\.v) == [40, 45])
+        #expect(seen.last?[Tier.sevenDay.rawValue]?.map(\.v) == [12])
+    }
+
+    @Test func aRestartSeedsTheSparklinesFromTheFile() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        make().record(publication(five: 40, week: 12))
+        drain()
+        var seen: [HistoryStore.History] = []
+        let again = make()
+        again.onSparklines = { seen.append($0) }
+        // The same event replays: nothing new is recorded, but the widget still gets what is on file.
+        again.record(publication(five: 40, week: 12))
+        #expect(seen.last?[Tier.fiveHour.rawValue]?.map(\.v) == [40])
+    }
+
+    @Test func meterHistoryOffForCodexHandsTheWidgetNothing() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        MeterHistory.set(false, for: CodexRecorder.historyAccount, in: defaults)
+        var calls = 0
+        let rec = make()
+        rec.onSparklines = { _ in calls += 1 }
+        rec.record(publication())
+        #expect(calls == 0)
+    }
+
     // MARK: Snapshot
 
     @Test func theSnapshotIsWrittenStampedWithTheEventsTime() throws {

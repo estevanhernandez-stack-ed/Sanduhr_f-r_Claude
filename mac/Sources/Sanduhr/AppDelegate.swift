@@ -155,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Codex polls while its source is on; a setup change or demo mode flipping re-decides. What a
         // reading leaves behind (history, snapshot, alerts) is the recorder's; a Mac with only Claude on
         // never starts the service, so neither callback ever runs there.
+        codexRecorder.onSparklines = { [weak self] in self?.codexUsage.setSparklines($0) }
         codexUsage.onUpdate = { [weak self] in
             self?.codexRecorder.record($0)
             self?.syncDeskSources()
