@@ -568,7 +568,7 @@ was. The mod needs no python3. The mod's files ride in the stamped folder (`buil
 without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
 folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
-**The Claude Code glow hook (item 51; "the notch glow hooks" before Settings v2).** *2.47.0 widened it: three events and one script, see Agent notifications; the entries and the Stop command below are 2.46's, kept for the older generations Update still recognizes.* The fourth kind needs no scripts and no python3: Install adds
+**The Claude Code hook (item 51; "the notch glow hooks" before Settings v2, "the Claude Code glow hook" from then to 2.47).** *2.47.0 widened it: three events and one script, see Agent notifications; the entries and the Stop command below are 2.46's, kept for the older generations Update still recognizes.* The fourth kind needs no scripts and no python3: Install adds
 one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen folder's
 `settings.json`, in the shape of Claude Code's settings schema (`{matcher?, hooks: [{type:
 "command", command, async, timeout}]}`):
@@ -2175,7 +2175,7 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 Settings v2 (item 72, `docs/settings-v2-spec.md`) gives each control one name across Settings,
 the menus, the tour, What's New and the setup guide. `Models/SettingsNames.swift` holds the names
 (Menu Bar Shows, Meetings menu in the menu bar, Notch: the island around the camera, Notch glow,
-Claude Code glow hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
+Claude Code hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
 Text) and the retired ones each replaced. A button or menu item that opens Settings reads
 `SettingsSection.linkTitle`, "<Page> Settings…" with the sidebar title exactly (Desk Settings…,
 Alerts Settings…, Watchers Settings…, Claude Code Settings…, Accounts Settings…), through
@@ -2235,7 +2235,7 @@ without scrolling blind.
   `SettingsWindowController.show(_:anchor:)` opens a page scrolled to one: one `ScrollViewReader`
   around the page scrolls to it twice (just after the page appears and again 0.3 s later, for
   rows a lazy form hadn't built yet). In-page links pass one: Needs the Desk opens Desk at its
-  switch, the Claude Code glow hook hints open Notch at Notch glow, the meters mod lines (Claude
+  switch, the Claude Code hook hints open Notch at Notch glow, the meters mod lines (Claude
   Code's folder boxes, Watchers) open Mods & Config at `meters`, Now Playing's links open Notch at Text and Desk at Where each piece sits.
 - **Links.** `sanduhr://settings/<page>#<anchor>` (and `estedesk://`) open there, `<page>` a raw
   value or an alias; an anchor the page lacks is dropped, and the host alone still opens Settings
@@ -2742,7 +2742,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Watchers (item 66) → `watchers.json` (the two switches, written by the app), `watch-request-*.json` (MCP server) and `watch-stop-*.json` (the Stop hook), mode 0600 in `~/Library/Application Support/Sanduhr/`, each deleted as the app reads it; the switches `watchersAgents` and `watchersBackground` in `com.626labs.sanduhr`; the work mark in the account's `accountData` entry (`"work": "true"`). Watchers themselves are in memory only
-- Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
+- Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the Claude Code hook in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Shortcuts (Settings v2) → desk preferences `hotKeySettings` and `hotKeyJoin`, seeded once from 2.10's `hotKeys`, which stays for an older build; Camera and mic's placement → `avPlace`; 2.10's `showClaude` is removed once its choice is in `layout`
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory

@@ -55,7 +55,8 @@ struct SettingsNamesTests {
         let names = SettingsNames.table.map(\.name)
         #expect(Set(names).count == names.count)
         #expect(SettingsNames.table.first { $0.name == "Menu Bar Shows" }?.page == .general)
-        #expect(SettingsNames.table.first { $0.name == "Claude Code glow hook" }?.page == .integrations)
+        #expect(SettingsNames.table.first { $0.name == "Claude Code hook" }?.page == .integrations)
+        #expect(SettingsNames.claudeCodeHook == "Claude Code hook")
         // A retired name is never a current one.
         for old in SettingsNames.retired.map(\.old) { #expect(!names.contains(old), "\(old)") }
         // Each retired name's replacement is a current name or a link title.
@@ -67,12 +68,24 @@ struct SettingsNamesTests {
 
     @Test func oneNameEverywhere() {
         #expect(MenuBarModeMenu.title == SettingsNames.menuBarShows)
-        #expect(IntegrationKind.hooks.title == SettingsNames.claudeCodeGlowHook)
+        #expect(IntegrationKind.hooks.title == SettingsNames.claudeCodeHook)
         #expect(DeskLayout.widgets.first { $0.key == "claude" }?.name == "Claude meters (line)")
         #expect(DeskLayout.widgets.first { $0.key == "meters" }?.name == "Claude meters (bars)")
         let check = SanduhrMenu.groups(widgetVisible: true, deepWork: false, pacing: false, snake: false)
             .flatMap(\.entries).first { $0.command == .checkForUpdates }
         #expect(check?.title == SettingsNames.checkForUpdates)
+    }
+
+    @Test func theHookIsOneNameAndSearchStillFindsItByGlow() {
+        // 2.48.0: "Claude Code glow hook" became "Claude Code hook", as on Windows.
+        #expect(SettingsNames.retiredNames(in: "Install the Claude Code glow hook") == ["Claude Code glow hook"])
+        #expect(SettingsNames.retiredNames(in: "Install the Claude Code hook").isEmpty)
+        #expect(SettingsNames.retired.first { $0.old == "Claude Code glow hook" }?.now == SettingsNames.claudeCodeHook)
+        for q in ["Claude Code hook", "glow", "glow hook", "hook"] {
+            let hit = SettingsSearch.hits(q).contains { $0.entry.title == SettingsNames.claudeCodeHook && $0.entry.page == .integrations }
+            #expect(hit, "\(q)")
+        }
+        #expect(SettingsSearch.hits("hook").first { $0.entry.title == SettingsNames.claudeCodeHook }?.entry.anchor == SettingsAnchor.folders)
     }
 
     @Test func retiredNamesAndUnknownLinksAreFound() {

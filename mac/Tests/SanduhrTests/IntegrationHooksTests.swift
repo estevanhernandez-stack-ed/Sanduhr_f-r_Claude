@@ -5,7 +5,7 @@ import Testing
 /// The Claude Code hook's install (item 51, 2.47): Sanduhr's entries join `hooks.UserPromptSubmit`,
 /// `hooks.Notification` and `hooks.Stop` in a folder's settings.json, and Remove takes out exactly
 /// those. On made-up homes only.
-@Suite("Integration installer, notch glow hooks")
+@Suite("Integration installer, Claude Code hook")
 struct IntegrationHooksTests {
     /// 2.47: each event runs the signal script while a Sanduhr runs (it writes the folder and
     /// session to a file, and on done item 66's report), then posts its Darwin notification.
@@ -494,7 +494,7 @@ struct IntegrationHooksTests {
     @Test func theKindNeedsNoPythonAndNoScripts() {
         #expect(!IntegrationKind.hooks.needsPython)
         #expect(!IntegrationKind.hooks.needsScripts)
-        #expect(IntegrationKind.hooks.title == "Claude Code glow hook")
+        #expect(IntegrationKind.hooks.title == "Claude Code hook")
         #expect(IntegrationKind.hooks.keyPath == "hooks.UserPromptSubmit, hooks.Notification and hooks.Stop")
     }
 
