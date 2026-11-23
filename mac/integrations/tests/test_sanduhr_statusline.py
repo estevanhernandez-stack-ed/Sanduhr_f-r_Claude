@@ -1047,7 +1047,8 @@ class CodexChipTests(unittest.TestCase):
                 with_cx = self.combined(mine)
                 bare = Rig()
                 try:
-                    bare.fresh()
+                    # The same Claude snapshot, so a minute rollover can't move the reset time.
+                    shutil.copyfile(self.r.snapshot, bare.snapshot)
                     args = ["--chain-b64", b64("echo mine"), "--join", "line"] + (["--mine", mine] if mine else [])
                     p, _ = bare.run(args, session_json())
                     baseline = p.stdout.decode()
