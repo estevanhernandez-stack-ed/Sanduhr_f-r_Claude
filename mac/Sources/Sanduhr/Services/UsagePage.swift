@@ -271,7 +271,8 @@ struct UsageOverview: Equatable, Sendable {
 
     /// The projects, the agents' merged in by name, each row of an agent-touched project carrying
     /// its shares (Claude Code's part is what the agents leave).
-    private static func rankedProjects(_ claude: [String: Int64], agents: [AgentSource: VaultWindow]) -> [UsageRanked] {
+    static func rankedProjects(_ claude: [String: Int64], agents: [AgentSource: VaultWindow],
+                               top: Int = topCount) -> [UsageRanked] {
         var totals = claude
         var shares: [String: [AgentSource: Int64]] = [:]
         for (agent, w) in agents {
@@ -280,7 +281,7 @@ struct UsageOverview: Equatable, Sendable {
                 shares[n, default: [:]][agent, default: 0] += v
             }
         }
-        return UsageRanked.ranked(totals, top: topCount).map { row in
+        return UsageRanked.ranked(totals, top: top).map { row in
             guard var split = shares[row.name] else { return row }
             split[.claude] = max(0, row.total - split.values.reduce(0, +))
             return UsageRanked(name: row.name, total: row.total, byAgent: split)
@@ -310,7 +311,25 @@ struct UsageTrends: Equatable, Sendable {
         let isCurrent: Bool
         /// Tokens, but some day of the week isn't covered: the bar gets a "no record" edge.
         let partialGap: Bool
+        /// The week's tokens from the agents other than Claude Code (`total` counts them too).
+        var agents: [AgentSource: Int64] = [:]
         var id: CCLocalDay { weekStart }
+
+        /// Claude Code's part of the week.
+        var claudeTokens: Int64 { total - agents.values.reduce(0, +) }
+
+        /// The stack, bottom up: Claude Code, then each agent with tokens, in agent order.
+        var segments: [(agent: AgentSource, tokens: Int64)] {
+            var out: [(agent: AgentSource, tokens: Int64)] = []
+            if claudeTokens > 0 { out.append((.claude, claudeTokens)) }
+            for a in AgentSource.burnRoots { if let t = agents[a], t > 0 { out.append((a, t)) } }
+            return out
+        }
+
+        /// "400", or with an agent in the week "1.4k (Claude Code 400, Codex 1.0k)".
+        var valueText: String {
+            agents.isEmpty ? TokenFormat.compact(total) : AgentShares.describe(total, agents.merging([.claude: claudeTokens]) { $1 })
+        }
     }
 
     static let ranges = [4, 12, 26]
@@ -321,30 +340,88 @@ struct UsageTrends: Equatable, Sendable {
     var top: [UsageRanked] = []
     var birth: CCLocalDay?
     var today: CCLocalDay?
+    /// Whether the account keeps a Claude Code record (the fresh-record note speaks of its logs).
+    var claudeRecord = true
+    /// The span's tokens per agent with any, Claude Code included; empty with Claude Code alone.
+    var agentTotals: [AgentSource: Int64] = [:]
 
     var maxTotal: Int64 { bars.map(\.total).max() ?? 0 }
+
+    /// Whether some agent other than Claude Code has tokens in the span: only then do the bars
+    /// stack by agent.
+    var stacked: Bool { !agentTotals.isEmpty }
+
+    /// The chart's accessible name: unchanged with Claude Code alone, each agent's span total
+    /// otherwise, so color is never the only cue (each bar's value gives its own shares).
+    var chartName: String {
+        stacked ? "Tokens by week, " + AgentShares.list(agentTotals) : "Claude Code tokens by week"
+    }
 
     /// "History kept since July 12, 2026".
     var footer: String? { birth.map { "History kept since \(UsageDates.long($0))" } }
 
     /// The first day or two: the backfill seeded about four weeks.
     var freshNote: String? {
-        guard let birth, let today, today.epochDay - birth.epochDay <= 1 else { return nil }
+        guard claudeRecord, let birth, let today, today.epochDay - birth.epochDay <= 1 else { return nil }
         return "A new record: its first pass kept about four weeks from Claude Code's logs. Longer trends fill in from here."
     }
 
-    static func build(weeks: [VaultWeek], top: [(name: String, total: Int64)], birth: CCLocalDay?,
-                      today: CCLocalDay) -> UsageTrends {
+    static func build(weeks: [VaultWeek], agents: [AgentSource: [VaultWeek]] = [:],
+                      top: [(name: String, total: Int64)], birth: CCLocalDay?, today: CCLocalDay) -> UsageTrends {
+        build(weeks: weeks, agents: agents, ranked: top.map { UsageRanked(name: $0.name, total: $0.total) },
+              birth: birth, today: today)
+    }
+
+    /// Trends from the Claude Code record's weeks (empty without one) and each agent root's weeks.
+    /// An agent with no tokens in the span is left out, so a Mac with Claude Code alone reads as
+    /// 2.47.1 whatever else sits in the Vault.
+    static func build(weeks: [VaultWeek], agents: [AgentSource: [VaultWeek]], ranked: [UsageRanked],
+                      birth: CCLocalDay?, today: CCLocalDay) -> UsageTrends {
         var t = UsageTrends()
         t.birth = birth
         t.today = today
-        t.bars = weeks.map { w in
-            let kind: Kind = w.total > 0 ? .bar : (w.hasNoRecordGap ? .noRecord : .zero)
-            return Bar(weekStart: w.weekStart, total: w.total, kind: kind, isCurrent: w.isCurrent,
-                       partialGap: w.total > 0 && w.hasNoRecordGap)
-        }
-        t.top = top.map { UsageRanked(name: $0.name, total: $0.total) }
+        t.claudeRecord = !weeks.isEmpty
+        let live = agents.filter { $0.value.contains { $0.total > 0 } }
+        t.bars = bars(weeks: weeks, agents: live)
+        t.top = ranked
+        t.agentTotals = agentTotals(t.bars)
         return t
+    }
+
+    /// One bar per week any source has. A week is "no record" or edged only when every source
+    /// has a gap in it: a source that covers the whole week proves its zero is real.
+    private static func bars(weeks: [VaultWeek], agents: [AgentSource: [VaultWeek]]) -> [Bar] {
+        let claude = Dictionary(weeks.map { ($0.weekStart, $0) }) { $1 }
+        let byAgent = agents.mapValues { list in Dictionary(list.map { ($0.weekStart, $0) }) { $1 } }
+        var starts = Set(claude.keys)
+        for list in byAgent.values { starts.formUnion(list.keys) }
+        return starts.sorted().map { start in
+            var others: [AgentSource: Int64] = [:]
+            var gaps: [Bool] = weeks.isEmpty ? [] : [claude[start]?.hasNoRecordGap ?? true]
+            var current = claude[start]?.isCurrent ?? false
+            for (agent, list) in byAgent {
+                let w = list[start]
+                if let t = w?.total, t > 0 { others[agent] = t }
+                gaps.append(w?.hasNoRecordGap ?? true)
+                current = current || (w?.isCurrent ?? false)
+            }
+            let total = (claude[start]?.total ?? 0) + others.values.reduce(0, +)
+            let gap = gaps.allSatisfy { $0 }
+            let kind: Kind = total > 0 ? .bar : (gap ? .noRecord : .zero)
+            return Bar(weekStart: start, total: total, kind: kind, isCurrent: current,
+                       partialGap: total > 0 && gap, agents: others)
+        }
+    }
+
+    /// Per agent over the bars, Claude Code included, and only when some other agent has tokens.
+    private static func agentTotals(_ bars: [Bar]) -> [AgentSource: Int64] {
+        var totals: [AgentSource: Int64] = [:]
+        for bar in bars {
+            for (a, t) in bar.agents { totals[a, default: 0] += t }
+        }
+        guard !totals.isEmpty else { return [:] }
+        totals[.claude] = bars.reduce(0) { $0 + $1.claudeTokens }
+        return totals.filter { $0.value > 0 }
     }
 }
 

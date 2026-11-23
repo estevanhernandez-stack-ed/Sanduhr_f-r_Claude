@@ -11,6 +11,9 @@ final class UsagePageModel {
     var picked: String?
     private(set) var overview: UsageOverview?
     private(set) var trends: UsageTrends?
+    /// Trends was read and found nothing to show (no record and no agent root): the tab then asks
+    /// for a record, as it did before agents.
+    private(set) var trendsEmpty = false
     var trendsWeeks = UsageTrends.defaultWeeks
     private(set) var rows: [LedgerRow] = []
     private(set) var sessionsLoaded = false
@@ -125,19 +128,20 @@ final class UsagePageModel {
         }
     }
 
+    /// Trends: the account's record and every agent root that has one. With neither, nothing.
     func loadTrends(_ vm: UsageViewModel, label: String) async {
-        guard let id = UsageSource.of(vm.dataChoices(for: label)).recordID else {
-            trends = nil
-            return
-        }
+        let id = UsageSource.of(vm.dataChoices(for: label)).recordID
         let vault = vm.vault.reader
         let weeks = trendsWeeks
         let g = begin("trends")
-        let result = await Task.detached(priority: .userInitiated) {
-            UsagePageLoader.trends(recordID: id, weeks: weeks, vault: vault, today: CCLocalDay(Date(), calendar: .current))
+        let result = await Task.detached(priority: .userInitiated) { () -> UsageTrends? in
+            guard id != nil || !vault.agentRoots().isEmpty else { return nil }
+            return UsagePageLoader.trends(recordID: id, weeks: weeks, vault: vault,
+                                          today: CCLocalDay(Date(), calendar: .current))
         }.value
         guard current("trends", g) else { return }
         trends = result
+        trendsEmpty = result == nil
     }
 
     /// The rows the list shows: all of them, or one agent's.
@@ -793,7 +797,18 @@ struct AgentStripStack: Equatable {
     init?(_ overview: UsageOverview, settings: AgentSourceSettings = .load()) {
         guard overview.stacked else { return nil }
         name = overview.stripName
-        colors = Dictionary(uniqueKeysWithValues: AgentSource.burn.map { ($0, settings.color(of: $0)) })
+        colors = Self.colors(settings)
+    }
+
+    /// The Trends bars' stack: nil with Claude Code alone, as in 2.47.1.
+    init?(trends: UsageTrends, settings: AgentSourceSettings = .load()) {
+        guard trends.stacked else { return nil }
+        name = trends.chartName
+        colors = Self.colors(settings)
+    }
+
+    private static func colors(_ settings: AgentSourceSettings) -> [AgentSource: String] {
+        Dictionary(uniqueKeysWithValues: AgentSource.burn.map { ($0, settings.color(of: $0)) })
     }
 
     func color(_ agent: AgentSource) -> Color { Color.hex(colors[agent] ?? agent.defaultColor) }

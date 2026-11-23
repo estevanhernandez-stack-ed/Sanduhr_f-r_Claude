@@ -41,12 +41,26 @@ enum UsagePageLoader {
         }
     }
 
-    /// Trends: `weeks` weeks ending with this one, and the top projects since the first.
-    static func trends(recordID id: String, weeks: Int, vault: VaultReader, today: CCLocalDay) -> UsageTrends {
-        let list = vault.readWeeks([id], weeks: weeks, today: today)
-        let from = list.first?.weekStart ?? today
-        let top = vault.topProjects([id], from: from, toExclusive: today.adding(days: 1), top: UsageTrends.topCount)
-        return UsageTrends.build(weeks: list, top: top, birth: vault.birthDate([id]), today: today)
+    /// Trends: `weeks` weeks ending with this one, and the top projects since the first. The
+    /// account's record (none without one) and every agent root with tokens in the span, as the
+    /// Overview combines them.
+    static func trends(recordID id: String?, weeks: Int, vault: VaultReader, today: CCLocalDay) -> UsageTrends {
+        let list = id.map { vault.readWeeks([$0], weeks: weeks, today: today) } ?? []
+        var agentWeeks: [AgentSource: [VaultWeek]] = [:]
+        for agent in vault.agentRoots() {
+            let w = vault.readWeeks([agent.rawValue], weeks: weeks, today: today)
+            if w.contains(where: { $0.total > 0 }) { agentWeeks[agent] = w }
+        }
+        let from = (list.first ?? agentWeeks.values.first?.first)?.weekStart ?? today
+        let to = today.adding(days: 1)
+        let claude = id.map { vault.readWindow([$0], from: from, toExclusive: to).byProjectName } ?? [:]
+        let windows = agentWeeks.keys.reduce(into: [AgentSource: VaultWindow]()) {
+            $0[$1] = vault.readWindow([$1.rawValue], from: from, toExclusive: to)
+        }
+        let roots = (id.map { [$0] } ?? []) + agentWeeks.keys.map(\.rawValue)
+        return UsageTrends.build(weeks: list, agents: agentWeeks,
+                                 ranked: UsageOverview.rankedProjects(claude, agents: windows, top: UsageTrends.topCount),
+                                 birth: vault.birthDate(roots), today: today)
     }
 
     /// The 30-day window of each agent root that has a record and tokens in it. Agents belong to
