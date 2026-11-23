@@ -377,9 +377,12 @@ where nothing drops prints byte for byte as it came, unless `with` is set. `with
 glyph between segments everywhere in the final line: between yours, between Sanduhr's (its usual
 ` | `) and at the same-row seam (its usual ` │ `); a powerline arrow takes the two neighbors'
 backgrounds. `--mine` is a comma list in this order:
-`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `context`
-(`ctx 8%`) and `model` (`Opus`), both from Claude Code's stdin; notices (stale, update) always
-show. Each flag is left out when it holds the default, so a combine without picks writes the same
+`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `codex`
+(`cx 5h 40% wk 12%`, 2.48), `context` (`ctx 8%`) and `model` (`Opus`), the last two from Claude Code's stdin;
+notices (stale, update) always show. `codex` is the Codex chip: always offered, it shows Codex whatever else is picked, and
+`nocodex` is a marker (it takes no style) that turns it off. A list with neither name keeps 2.46's rule, cx shows when session
+or weekly is in the list, so every older command prints and rewrites the same bytes; the sheet writes the smallest form, and
+the keep-one guard ignores Codex. Each flag is left out when it holds the default, so a combine without picks writes the same
 command as before, and older combined commands read and run unchanged. Swift checks the payloads
 exactly as the script does, so a hand-edited command it would refuse stays the user's.
 
@@ -895,15 +898,20 @@ a cache keyed by file size and modification time means an unchanged `.jsonl.zst`
 - **Primary and combined bars.** Primary (Claude by default) is the source the menu bar and the combined bars' fill follow;
   a source that is off can't lead. With two sources on, two combined bars (5-hour, weekly) draw `SourceBar`'s two-tone
   layout (the primary's fill, a tick where the other is) with no warning glow, breath or pace tick, then a section per
-  source with a header (name, color, Codex's "as of"); Codex's cards leave out Claude's limit menu, local burn and sparkline.
+  source with a header (name, color, Codex's "as of"); Codex's cards leave out Claude's limit menu and local burn, and draw a
+  sparkline from `history.@codex.json` (2.48: the recorder keeps the recent window in memory and `WidgetSources.build` puts each
+  tier's points on its card; meter history off for `@codex` draws none, and demo mode draws a made-up one).
   A lone Claude section has no header, and one source on draws today's widget exactly. Compact keeps the primary's
   highest card. The menu bar's tooltip appears only when the other source is further out or a Codex primary is stale.
 - **Desk meters.** A meter piece's source is a `src=` field of the layout word (`Combined` writes nothing, so every older
-  word round-trips); only `claude` and `meters` take one. A Codex meter never pulses.
+  word round-trips); only `claude` and `meters` take one. Pulses are keyed by source and limit (2.48, reversing 2.46's "Codex never pulses"):
+  a Codex alert with the Desk in Alerts' delivery pulses the pieces that show Codex, a Codex piece or a Combined row joined with
+  Codex, and never a Claude-only piece; with Desk-only delivery and no such piece it stays a banner (`Notifier.deskCanPulse`).
+  Combined rows now pulse for Claude alerts too. Quiet hours still leave pulses alone, and a Claude-only Mac pulses as before.
 - **Alerts.** Per source, on `codex|tier|resets_at|kind` once-keys; Codex alerts are off by default and arrive as banners.
 - **Files.** `history.@codex.json` (HistoryStore, the reserved `@codex` account; 30 days) and `snapshot.codex.json` beside
   `snapshot.json`, same schema with `source: "codex"` and no `account_ref`. The snapshot goes when Codex is turned off or a
-  reading comes back empty. `sanduhr_statusline.py` appends `cx 5h 40% wk 12%` while it is under 30 minutes old, and
+  reading comes back empty. `sanduhr_statusline.py` appends `cx 5h 40% wk 12%` while it is under 30 minutes old (Combine's Codex chip, below), and
   `sanduhr_mcp.py` (0.6.0-mac) adds a `codex` block to `get_usage` (`status`, `stale`, `as_of`, `age_seconds`, `plan`,
   `tiers`) when it reads; a test checks the MCP and the statusline import no network module.
 - **Demo mode** shows a sample Codex section when Codex is on and never reads `~/.codex`.
@@ -928,7 +936,12 @@ total) so a grown rollout resumes.
   source is switched off): the widget footer's per-agent pieces (`TokenFormat.compact`, the burn between the last two ingests, left
   out when zero, none in demo), `UsageStripChart` stacked by agent with each agent's 30-day total in its accessible name,
   `UsageRankedList` shares ("13.0M (Codex)"), the Sessions agent filter (shown with more than one agent) and label, and
-  `VaultLedgerCsv`'s trailing `agent` column (always appended, Claude-only included). Trends and Skills stay Claude-only.
+  `VaultLedgerCsv`'s trailing `agent` column (always appended, Claude-only included). Skills stays Claude-only. Trends reads the
+  agent roots too (2.48, `UsageTrends.build`, `UsagePageLoader.trends`): agent roots with tokens in the span stack into the weeks
+  in source colors with a legend, the chart's accessible name gives each agent's total, a week reads "no record" only when every
+  contributing source has a gap that week, an idle agent root changes nothing, top projects merge by name with shares, the
+  footer's "History kept since" uses the earliest contributing root, and a Mac with agents and no Claude record still shows
+  Trends. A Claude-only Trends is pinned as 2.47.1 drew it.
 - **Erase.** Erasing an agent's record under Records on this Mac sets `vault.agentStopped.<agent>` and then purges; the agent
   stays stopped until its source is switched on again.
 

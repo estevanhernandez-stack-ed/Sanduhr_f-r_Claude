@@ -756,7 +756,7 @@ private struct IntegrationConsentSheet: View {
         case .mcp: "Let Claude Code ask Sanduhr about your usage?"
         case .statusline: "Show the meters in Claude Code?"
         case .meters: MetersConsentSheet.headline
-        case .hooks: "Glow the notch when Claude Code needs you?"
+        case .hooks: HooksConsentCopy.headline
         }
     }
 
@@ -805,6 +805,9 @@ struct OtherCommandBox: View {
 /// The Claude Code hook's Install question (2.47): what it tells Sanduhr, and exactly what it reads
 /// and keeps. Pinned by IntegrationHooksTests.
 enum HooksConsentCopy {
+    /// The Install question: the hook notifies, shows a Desk card and glows, so the headline names the events.
+    static let headline = "Let Claude Code tell Sanduhr when it finishes or needs you?"
+
     static func lead(_ folder: String) -> String {
         "Claude Code sessions using \(folder) tell Sanduhr when you send a prompt, when they wait on you (a permission prompt or a question) and when a turn finishes, so Sanduhr can time the turn, notify you and glow the notch."
     }

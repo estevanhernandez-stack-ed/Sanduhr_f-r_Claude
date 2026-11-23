@@ -515,6 +515,12 @@ struct IntegrationHooksTests {
 
     /// The Install question says exactly what the hook reads and keeps (2.47): Claude Code's input,
     /// of which only the folder and the session id are kept, in a file Sanduhr deletes as it reads it.
+    /// The Install question's headline names all three things the hook does, not just the glow (2.48).
+    @Test func theConsentHeadlineMatchesTheThreeEventHook() {
+        #expect(HooksConsentCopy.headline == "Let Claude Code tell Sanduhr when it finishes or needs you?")
+        #expect(!HooksConsentCopy.headline.lowercased().contains("glow"))
+    }
+
     @Test func theConsentCopySaysWhatTheHookReadsAndKeeps() {
         #expect(HooksConsentCopy.lead("~/.claude") == "Claude Code sessions using ~/.claude tell Sanduhr when you send a prompt, when they wait on you (a permission prompt or a question) and when a turn finishes, so Sanduhr can time the turn, notify you and glow the notch.")
         #expect(HooksConsentCopy.keeps == "The hook reads what Claude Code hands it, which includes your prompt, and keeps only the session's folder and its session id. It writes those two to a small file in Sanduhr's folder, which Sanduhr deletes as it reads it, and nothing else. Nothing leaves this Mac, and while Sanduhr isn't running the hook writes nothing.")

@@ -743,7 +743,7 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
 - [ ] Settings, Claude Code: `~/.claude-smoketest` has a fourth row, **Claude Code hook**, Not installed, and Install… works even where the page says Python is missing. Settings search for `glow`,
   `hook` and `Claude Code hook` each reaches the row. Under the folders, a line says the Claude Code hook only tells Sanduhr and the glow is off until turned on in Notch, Notch glow, and Notch Settings… opens
   the Notch page.
-- [ ] Install…: the sheet is headed "Glow the notch when Claude Code needs you?" and says Claude Code sessions in the folder tell Sanduhr when you send a prompt, when they wait on you and when a turn
+- [ ] Install…: the sheet is headed "Let Claude Code tell Sanduhr when it finishes or needs you?" and says Claude Code sessions in the folder tell Sanduhr when you send a prompt, when they wait on you and when a turn
   finishes, so Sanduhr can time the turn, notify you and glow the notch; that the hook reads what Claude Code hands it, which includes your prompt, and keeps only the session's folder and its session id; and that
   Sanduhr adds one entry to each of `hooks.UserPromptSubmit, hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`, and Remove takes out only those three entries. Notch Settings…
   there opens the Notch page. Install: Installed, and `jq '.hooks | keys' ~/.claude-smoketest/settings.json` lists `Notification`, `Stop` and `UserPromptSubmit`.
