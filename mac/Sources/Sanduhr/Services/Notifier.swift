@@ -57,7 +57,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let settings = AlertSettings(defaults)
         var fired = defaults.stringArray(forKey: Key.fired) ?? []
         let outcome = AlertRules.evaluate(usage: usage, previous: previous, settings: settings,
-                                          fired: Set(fired), deskRunning: DeskController.shared.running,
+                                          fired: Set(fired), deskRunning: deskCanPulse(source),
                                           now: Date(),
                                           hidden: source == .claude ? MeterVisibility.hidden(in: UserDefaults.desk) : [],
                                           source: source, freshTiers: freshTiers)
@@ -65,7 +65,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         // Recorded even when quiet hours hold the banner back, so nothing bursts out at the end.
         fired.append(contentsOf: outcome.alerts.map(\.onceKey))
         defaults.set(Array(fired.suffix(Self.firedLimit)), forKey: Key.fired)
-        deliver(outcome, sound: settings.sound)
+        deliver(outcome, sound: settings.sound, source: source)
     }
 
     /// An account switch: the next fetch is the new account's first, so nothing is compared with
@@ -100,12 +100,20 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - Private
 
-    private func deliver(_ outcome: AlertOutcome, sound: String) {
+    /// Whether the Desk can pulse for `source`'s alert. Claude's is the Desk running, as it always was;
+    /// Codex's also needs a meters piece that shows Codex (DeskController.canPulse), so Codex alerts reach
+    /// the Desk only where there is a Codex meter to light. Called on the main thread, as both sources' readings are.
+    private func deskCanPulse(_ source: AgentSource) -> Bool {
+        guard source != .claude else { return DeskController.shared.running }
+        return MainActor.assumeIsolated { DeskController.shared.canPulse(source) }
+    }
+
+    private func deliver(_ outcome: AlertOutcome, sound: String, source: AgentSource = .claude) {
         // A Desk pulse always glows the notch (DeskController.pulse); a banner alone glows it
         // when Settings, Desk, Notch, Glow asks. One glow either way, never two.
         if outcome.pulse {
             let tiers = Set(outcome.alerts.map(\.tier))
-            DispatchQueue.main.async { MainActor.assumeIsolated { DeskController.shared.pulse(tiers) } }
+            DispatchQueue.main.async { MainActor.assumeIsolated { DeskController.shared.pulse(tiers, source: source) } }
         } else if outcome.banner {
             DispatchQueue.main.async { MainActor.assumeIsolated { NotchGlowController.shared.event(.alert) } }
         }

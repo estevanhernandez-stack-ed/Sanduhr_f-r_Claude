@@ -258,9 +258,18 @@ final class DeskController: NSObject, NSMenuDelegate {
 
     /// An alert chose the Desk (or the debug pulse): pulse those meters once and glow the notch,
     /// whatever the Glow switches, so a pulse has the one notch glow (item 27).
-    @MainActor func pulse(_ tiers: Set<Tier>) {
-        model.pulse(tiers)
+    @MainActor func pulse(_ tiers: Set<Tier>, source: AgentSource = .claude) {
+        model.pulse(tiers, source: source)
         NotchGlowController.shared.fire()
+    }
+
+    /// Whether an alert for `source` has a Desk piece to pulse: the Desk runs and, for another source than
+    /// Claude, a meters piece shows it (`DeskModel.canPulse`). Alerts' delivery reads this as "Desk running",
+    /// so a Codex alert with no Codex piece stays a banner instead of going nowhere.
+    @MainActor func canPulse(_ source: AgentSource) -> Bool {
+        guard running else { return false }
+        let saved = UserDefaults.desk.object(forKey: DeskArrangeMode.layoutKey) as? String ?? DeskLayout.standard
+        return model.canPulse(source, saved: saved)
     }
 
     /// Reads Calendar access again (Settings opening, Sanduhr becoming active), while Desk runs.
