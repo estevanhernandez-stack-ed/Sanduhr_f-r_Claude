@@ -58,11 +58,15 @@ enum StatuslineJoinGlyph: String, CaseIterable, Sendable {
 
 /// Sanduhr's own segments in a combined statusline (item 63b), in the order they print.
 enum SanduhrSegment: String, CaseIterable, Sendable {
-    case label, session, weekly, resets, context, model
+    case label, session, weekly, resets, codex, context, model
 
     /// What Sanduhr's line shows without `--mine`. The label shows only in a folder linked to an
     /// account.
     static let defaults: [SanduhrSegment] = [.label, .session, .weekly, .resets]
+
+    /// The marker `--mine` takes for "no Codex" (2.48): not a segment, so it has no chip and no look.
+    /// A list with neither `codex` nor this keeps the 2.46 rule: Codex's cx rides with session and weekly.
+    static let codexOffName = "nocodex"
 
     var title: String {
         switch self {
@@ -70,23 +74,45 @@ enum SanduhrSegment: String, CaseIterable, Sendable {
         case .session: "Session"
         case .weekly: "Weekly"
         case .resets: "Weekly reset"
+        case .codex: "Codex"
         case .context: "Context"
         case .model: "Model"
         }
     }
 
-    /// `--mine`'s list: names in this order, each once, at least one. Nil for anything else.
-    static func parseList(_ text: String) -> [SanduhrSegment]? {
-        let names = text.components(separatedBy: ",")
-        let segments = names.compactMap(SanduhrSegment.init(rawValue:))
-        guard segments.count == names.count, !segments.isEmpty else { return nil }
-        let order = segments.map { allCases.firstIndex(of: $0)! }
-        guard zip(order, order.dropFirst()).allSatisfy({ $0 < $1 }) else { return nil }
-        return segments
+    /// What the chip's tooltip and caption say; `now` is what it shows right now (the segment's text,
+    /// or its name when it has nothing to show).
+    func caption(now: String) -> String {
+        switch self {
+        case .label: return "Account: the name of the account this folder is linked to on Accounts. It shows only in a linked folder."
+        case .session: return "Session: the 5-hour limit, as in \(now)."
+        case .weekly: return "Weekly: the 7-day limit, as in \(now), and a model's own weekly limit when it nears full."
+        case .resets: return "Weekly reset: when the 7-day limit resets, as in \(now)."
+        case .codex: return "Codex: its 5-hour and weekly limits, as in \(now.hasPrefix("cx ") ? now : "cx 5h 40% wk 12%"). It shows only while Codex is on and its numbers are under 30 minutes old."
+        case .context: return "Context: how full the session's context window is, as in \(now), from Claude Code."
+        case .model: return "Model: the session's model, as in \(now), from Claude Code."
+        }
     }
 
-    static func list(_ segments: [SanduhrSegment]) -> String {
-        allCases.filter(segments.contains).map(\.rawValue).joined(separator: ",")
+    /// `--mine`'s list: names in this order, each once, at least one. `nocodex` takes Codex's place in
+    /// the order and says "no Codex". Nil for anything else.
+    static func parseList(_ text: String) -> (segments: [SanduhrSegment], codexOff: Bool)? {
+        let names = text.components(separatedBy: ",")
+        let codexOff = names.contains(codexOffName)
+        let segments = names.compactMap(SanduhrSegment.init(rawValue:))
+        guard segments.count + (codexOff ? 1 : 0) == names.count, !segments.isEmpty else { return nil }
+        let order = names.map { $0 == codexOffName ? SanduhrSegment.codex : SanduhrSegment(rawValue: $0)! }
+            .map { allCases.firstIndex(of: $0)! }
+        guard zip(order, order.dropFirst()).allSatisfy({ $0 < $1 }) else { return nil }
+        return (segments, codexOff)
+    }
+
+    /// The list as written: `codexOff` puts the marker where Codex would sit.
+    static func list(_ segments: [SanduhrSegment], codexOff: Bool = false) -> String {
+        allCases.compactMap { s in
+            if s == .codex, codexOff { return codexOffName }
+            return segments.contains(s) ? s.rawValue : nil
+        }.joined(separator: ",")
     }
 }
 
@@ -209,11 +235,25 @@ struct StatuslineSelection: Equatable, Sendable {
     var theirs: StatuslinePicks?
     var mine: [SanduhrSegment]?
     var band = false
+    /// `--mine` carries the `nocodex` marker: Codex's meters stay off even beside session or weekly.
+    var codexOff = false
 
-    init(theirs: StatuslinePicks? = nil, mine: [SanduhrSegment]? = nil, band: Bool = false) {
+    init(theirs: StatuslinePicks? = nil, mine: [SanduhrSegment]? = nil, band: Bool = false, codexOff: Bool = false) {
         self.theirs = theirs
         self.mine = mine
         self.band = band
+        self.codexOff = codexOff
+    }
+
+    /// What the line shows, Codex included as the script decides it: `codex` in the list or, in a
+    /// list with neither name (every one written before the chip), session or weekly in it.
+    var shown: [SanduhrSegment] {
+        let listed = mine ?? SanduhrSegment.defaults
+        var out = listed.filter { $0 != .codex }
+        if listed.contains(.codex) || (!codexOff && (out.contains(.session) || out.contains(.weekly))) {
+            out.append(.codex)
+        }
+        return SanduhrSegment.allCases.filter(out.contains)
     }
 }
 
@@ -262,7 +302,9 @@ extension IntegrationInstaller {
     static func pickFlags(_ selection: StatuslineSelection) -> [String] {
         var out: [String] = []
         if let theirs = selection.theirs { out += ["--keep-theirs-b64", theirs.base64] }
-        if let mine = selection.mine, !mine.isEmpty { out += ["--mine", SanduhrSegment.list(mine)] }
+        if let mine = selection.mine ?? (selection.codexOff ? SanduhrSegment.defaults : nil), !mine.isEmpty {
+            out += ["--mine", SanduhrSegment.list(mine, codexOff: selection.codexOff)]
+        }
         if selection.band { out.append("--band") }
         return out
     }
@@ -291,8 +333,9 @@ extension IntegrationInstaller {
             words.removeLast()
         }
         if words.count >= 2, words[words.count - 2] == "--mine" {
-            guard let mine = SanduhrSegment.parseList(words[words.count - 1]) else { return nil }
-            selection.mine = mine
+            guard let list = SanduhrSegment.parseList(words[words.count - 1]) else { return nil }
+            selection.mine = list.segments
+            selection.codexOff = list.codexOff
             words.removeLast(2)
         }
         if words.count >= 2, words[words.count - 2] == "--keep-theirs-b64" {

@@ -13,8 +13,9 @@ Per-seat meters (item 74): the session's Claude Code folder (CLAUDE_CONFIG_DIR, 
 snapshot.<account_ref>.json, any other reads snapshot.json (Sanduhr's active account) as before.
 Codex (agent sources): when snapshot.codex.json beside the snapshot is under 30 minutes old by its
 `captured_at`, its meters follow Claude's as `cx 5h 40% wk 12%` (nothing when it is absent, stale or
-a newer schema; a Codex-only Mac prints just that). It rides with the session and weekly meters, so
-`--mine` without either hides it; with `--band` it stays here, since the band draws Claude's alone.
+a newer schema; a Codex-only Mac prints just that). A `--mine` list with neither `codex` nor `nocodex`
+shows it exactly when it has session or weekly; `codex` shows it whatever else is picked, `nocodex`
+hides it. With `--band` it stays here, since the band draws Claude's alone.
 Per-model weeklies join only when hot (>= 80%). Reads the snapshot only; never
 touches claude.ai or the session key. When the snapshot is dead or missing and Claude
 Code's session JSON on stdin carries `rate_limits`, those numbers stand in, each marked
@@ -38,8 +39,8 @@ its leading token (`matcher`), and segments whose matcher is dropped go, the res
 their own separators with their colors (reset between). Segments never seen follow `new`. A line
 that loses every segment goes; when nothing of theirs is left, Sanduhr's line shows alone. Any
 doubt (an unfinished escape, a carriage return, an empty segment) keeps the line whole.
-`--mine <list>` picks Sanduhr's own: session, weekly, resets (the default three), context,
-model (the last two from Claude Code's stdin).
+`--mine <list>` picks Sanduhr's own: session, weekly, resets (the default three), codex, context,
+model (the last two from Claude Code's stdin), and the `nocodex` marker.
 
 The band (item 65f): a trailing `--band` moves Sanduhr's meters (session, weekly, resets, with
 any notice) out of the statusline into the sanduhr-meters mod's animated band above the prompt;
@@ -89,8 +90,12 @@ B64 = re.compile(r"\A[A-Za-z0-9+/]+={0,2}\Z")
 
 # Sanduhr's own segments, in the order they print (item 63b); the first four are the default.
 # `label` is the linked account's name from seats.json, shown only in a linked folder.
-MINE = ("label", "session", "weekly", "resets", "context", "model")
+# `codex` is Codex's `cx 5h 40% wk 12%` (2.48). A list with neither `codex` nor `nocodex` keeps the 2.46
+# rule, so older commands print what they did: cx rides with session and weekly. `codex` turns it on
+# whatever else is picked; `nocodex` (a marker, not a segment: it takes no style) turns it off.
+MINE = ("label", "session", "weekly", "resets", "codex", "context", "model")
 MINE_DEFAULT = ("label", "session", "weekly", "resets")
+CODEX_OFF = "nocodex"
 LABEL_MAX = 40
 
 
@@ -441,12 +446,22 @@ def codex_segment(now, env=None):
     return "cx " + " ".join(bits) if bits else None
 
 
+def codex_wanted(mine):
+    """Whether a `--mine` list shows Codex's meters: `codex` says so, `nocodex` says not, and a list
+    with neither (every list written before the chip) keeps them exactly when it has session or weekly."""
+    if "codex" in mine:
+        return True
+    if CODEX_OFF in mine:
+        return False
+    return "session" in mine or "weekly" in mine
+
+
 def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT, codex=None):
     """Sanduhr's line as (base, extra) for `format_parts`: the snapshot's parts, or stdin's
     `rate_limits` when the snapshot is dead or missing (`stdin_bytes` is a callable so plain
     mode reads stdin only then), and stdin's context and model when `mine` asks for them. Codex's
-    meters follow as an extra named `codex` (not a `--mine` name: it rides with the session and
-    weekly meters, so a pick without either hides it); `codex` overrides that for the band."""
+    meters follow as an extra named `codex` when `codex_wanted(mine)` says so; `codex` overrides that
+    for the band."""
     cache = []
 
     def session():
@@ -472,7 +487,7 @@ def segment_parts(stdin_bytes, now, mine=MINE_DEFAULT, codex=None):
     extra = session_parts(session()) if "context" in mine or "model" in mine else []
     extra = list(extra)
     if codex is None:
-        codex = "session" in mine or "weekly" in mine
+        codex = codex_wanted(mine)
     cx = codex_segment(now) if codex else None
     if cx:
         extra = [("codex", cx)] + extra
@@ -918,11 +933,12 @@ def parse_picks(b64):
 
 
 def parse_mine(text):
-    """The `--mine` list: Sanduhr's segment names, comma-separated, in MINE's order, each once.
-    None when it is anything else."""
+    """The `--mine` list: Sanduhr's segment names (and the `nocodex` marker), comma-separated, in MINE's
+    order, each once. None when it is anything else."""
     names = text.split(",")
     try:
-        idx = [MINE.index(n) for n in names]
+        # `nocodex` sits in Codex's slot, so a list can't hold both.
+        idx = [MINE.index("codex" if n == CODEX_OFF else n) for n in names]
     except ValueError:
         return None
     if any(b <= a for a, b in zip(idx, idx[1:])):
@@ -1276,8 +1292,7 @@ def combined(theirs, data, now, mode, padding, picks, mine, cols, band=False):
     styles = (picks or {}).get("ours") or {}
     if band:
         # The band mod draws Claude's meters only, so Codex's stay here unless `--mine` leaves meters out.
-        _, extra = segment_parts(lambda: data, now, mine or (),
-                                 codex=mine is None or "session" in mine or "weekly" in mine)
+        _, extra = segment_parts(lambda: data, now, mine or (), codex=mine is None or codex_wanted(mine))
         ours = sep.join(styled_text(text, styles.get(name)) for name, text in extra
                         if name in (mine or ()) or name == "codex")
     else:
