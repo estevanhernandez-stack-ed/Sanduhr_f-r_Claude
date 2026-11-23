@@ -35,7 +35,12 @@ enum AgentShares {
 
     /// The strip's accessible name: "30 days, Claude Code 41M, Codex 6.2M".
     static func stripName(_ byAgent: [AgentSource: Int64]) -> String {
-        "30 days, " + ordered(byAgent).joined(separator: ", ")
+        "30 days, " + list(byAgent)
+    }
+
+    /// Each agent with tokens and its total, in agent order: "Claude Code 41M, Codex 6.2M".
+    static func list(_ byAgent: [AgentSource: Int64]) -> String {
+        ordered(byAgent).joined(separator: ", ")
     }
 
     private static func ordered(_ byAgent: [AgentSource: Int64]) -> [String] {
