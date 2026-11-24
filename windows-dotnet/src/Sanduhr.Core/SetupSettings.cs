@@ -47,8 +47,10 @@ public sealed record SetupSettings(bool Desktop, IReadOnlyDictionary<string, boo
     }
 }
 
-/// <summary>The three ticks on the setup screen (spec 2). Desktop reads as ticked only while the Desk runs (spec 1, the Desk page's own switch).</summary>
-public sealed record SetupChoices(bool Desktop, bool Drawers, bool ClaudeUsage, bool CodexUsage = false)
+/// <summary>The three ticks on the setup screen (spec 2), and the ready-made look picked to start with (5.0 spec 5; null for none).
+/// Desktop reads as ticked only while the Desk runs (spec 1, the Desk page's own switch). The look is a choice for Continue, never
+/// stored: <see cref="ToSettings"/> leaves it out.</summary>
+public sealed record SetupChoices(bool Desktop, bool Drawers, bool ClaudeUsage, bool CodexUsage = false, string? Look = null)
 {
     /// <summary>A first run's ticks: the desktop and drawers, no usage.</summary>
     public static SetupChoices FirstRun { get; } = new(true, true, false);

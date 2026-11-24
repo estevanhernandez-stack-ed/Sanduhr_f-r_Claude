@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "editorial",
+  "name": "Editorial",
+  "blurb": "A big serif clock and a pull quote.",
+  "font_fallback": "Times New Roman",
+  "design": {
+    "layout": {
+      "clock": { "anchor": "tl", "size": 1.5 },
+      "message": { "anchor": "tc", "size": 1.1 },
+      "weather": { "anchor": "bl", "size": 1 },
+      "claude": { "hidden": true },
+      "meters": { "hidden": true },
+      "nowPlaying": { "hidden": true },
+      "telemetry": { "hidden": true },
+      "watchers": { "hidden": true },
+      "launcher": { "hidden": true },
+      "glow": { "hidden": true },
+      "companion": { "hidden": true }
+    },
+    "font": "Georgia",
+    "ink": "light",
+    "plate": false,
+    "shadow": true,
+    "glow": false,
+    "follows_theme": false
+  }
+}

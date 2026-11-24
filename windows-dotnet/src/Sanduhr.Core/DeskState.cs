@@ -14,7 +14,7 @@ public static class DeskState
 {
     public const int SchemaVersion = 1;
 
-    /// <summary>The Desk's current look as a full design, built from the settings and the active widget theme.</summary>
+    /// <summary>The Desk's current look as a full design, built from the settings and the active widget theme. The neon glow is reported as <c>glow</c>: false, or its strength.</summary>
     /// <param name="theme">The active theme as its JSON document (<see cref="ThemeDraft.ToJson"/>); null leaves it out.</param>
     /// <param name="weatherNickname">The weather piece's nickname (#315), "" or null for none; reported as <c>weather.nickname</c>.</param>
     /// <param name="followsTheme">"Follow the widget theme" (theme match), reported as <c>follows_theme</c>.</param>
@@ -30,6 +30,7 @@ public static class DeskState
             Ink = InkChoice(ink),
             Plate = desk.Plate,
             Shadow = ink.Shadow,
+            Glow = ink.Glow ? new DeskGlowChoice(true, DeskGlow.Clamp(ink.GlowStrength)) : DeskGlowChoice.Off,
             Launcher = launcher,
             Theme = theme,
             Weather = new DeskWeatherChange(weatherNickname ?? ""),

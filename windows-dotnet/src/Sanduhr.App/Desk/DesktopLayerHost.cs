@@ -41,11 +41,12 @@ internal sealed class DesktopLayerHost : IDeskHost
     private static readonly TimeSpan FastWatch = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan FastFor = TimeSpan.FromSeconds(3);
 
-    /// <summary>Room around an island for the ink's shadow, in DIPs.</summary>
-    private const double Pad = 16;
+    /// <summary>The room around an island for the ink's shadow or glow (<see cref="DeskIsland.Pad"/>); none for a Glass drawer, whose blur
+    /// fills the whole window and so must be the panel's size.</summary>
+    private static double PadOf(DeskIsland island) => island is { Glass: true, Drawer: true } ? 0 : island.Pad;
 
-    /// <summary>The room around an island: none for a Glass drawer, whose blur fills the whole window and so must be the panel's size.</summary>
-    private static double PadOf(DeskIsland island) => island is { Glass: true, Drawer: true } ? 0 : Pad;
+    /// <summary>The room each window was laid out with, for OLED care's drift, which holds the content (the window less its room).</summary>
+    private readonly Dictionary<HwndSource, double> _pads = [];
 
     private readonly List<HwndSource> _windows = [];
     /// <summary>The screen each window in <see cref="_windows"/> draws on.</summary>
@@ -249,6 +250,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         double cw = Math.Ceiling(content.DesiredSize.Width), ch = Math.Ceiling(content.DesiredSize.Height);
         Unfollow(src);
         double pad = PadOf(island);
+        _pads[src] = pad;
         var (left, top) = Origin(island, island.Motion?.Anchor ?? island.Anchor, cw, ch, pad);
         double w = cw + 2 * pad, h = ch + 2 * pad;
         if (island.Motion is { } motion) Follow(src, screen, island, motion, cw, ch);
@@ -379,7 +381,7 @@ internal sealed class DesktopLayerHost : IDeskHost
         var hwnd = src.Handle;
         var home = new PxRect(x, y, pw, ph);
         _homes[src] = (home, screen);
-        var at = IsDrawer(src) ? home : Drifted(home, screen);
+        var at = IsDrawer(src) ? home : Drifted(home, screen, _pads.GetValueOrDefault(src, DeskGlow.BasePad));
         // Physical pixels in, physical pixels out: the same per-monitor context the monitors were read in.
         DeskNative.PerMonitor(() =>
         {
@@ -402,12 +404,12 @@ internal sealed class DesktopLayerHost : IDeskHost
     }
 
     /// <summary>Where a window at <paramref name="home"/> sits with OLED care's drift: the orbit's point, applied to the
-    /// window as a whole. The orbit is held to the content (the window less its shadow room) so a piece never leaves the
+    /// window as a whole. The orbit is held to the content (the window less the room around it) so a piece never leaves the
     /// monitor's work area or crosses the taskbar's clearance; the padding rides along. Drawer windows never drift (<see cref="IsDrawer"/>).</summary>
-    private PxRect Drifted(PxRect home, DeskScreen screen)
+    private PxRect Drifted(PxRect home, DeskScreen screen, double padDips)
     {
         if (_drift is not { } step) return home;
-        int pad = (int)Math.Round(Pad * screen.Scale);
+        int pad = (int)Math.Round(padDips * screen.Scale);
         var content = new PxRect(home.X + pad, home.Y + pad, Math.Max(1, home.Width - 2 * pad), Math.Max(1, home.Height - 2 * pad));
         var moved = OledDrift.Drifted(content, step, screen.Work, ExtraClearance(screen));
         return home with { X = home.X + (moved.X - content.X), Y = home.Y + (moved.Y - content.Y) };
@@ -433,7 +435,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             foreach (var w in _windows)
             {
                 if (w.IsDisposed || IsDrawer(w) || !_homes.TryGetValue(w, out var h)) continue;
-                var at = Drifted(h.Home, h.Screen);
+                var at = Drifted(h.Home, h.Screen, _pads.GetValueOrDefault(w, DeskGlow.BasePad));
                 if (DeskNative.Rect(w.Handle) != at)
                     DeskNative.SetWindowPos(w.Handle, IntPtr.Zero, at.X, at.Y, at.Width, at.Height,
                         DeskNative.SWP_NOACTIVATE | DeskNative.SWP_NOZORDER | DeskNative.SWP_NOOWNERZORDER | DeskNative.SWP_NOSIZE);
@@ -473,6 +475,7 @@ internal sealed class DesktopLayerHost : IDeskHost
             _screens.Clear();
             _drawers.Clear();
             _homes.Clear();
+            _pads.Clear();
             _blur.Clear();
             _cloaked.Clear();
         }

@@ -13,10 +13,18 @@ internal partial class SetupWindow : Window
     internal SetupWindow(SetupViewModel model)
     {
         InitializeComponent();
+        MaxHeight = SystemParameters.WorkArea.Height;   // never taller than the screen: the tiles scroll, Continue stays
         Model = model;
         DataContext = model;
         Title = SetupCopy.Title;
         model.Applied += _ => Close();
         model.Dismissed += Close;
+    }
+
+    /// <summary>The wheel over the looks strip scrolls it sideways instead of going nowhere (the strip has no vertical scroll of its own).</summary>
+    private void LooksStrip_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+    {
+        LooksStrip.ScrollToHorizontalOffset(LooksStrip.HorizontalOffset - e.Delta);
+        e.Handled = true;
     }
 }

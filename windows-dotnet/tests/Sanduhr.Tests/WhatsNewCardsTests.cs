@@ -13,6 +13,7 @@ public class WhatsNewCardsTests
     {
         Assert.Equal(
             ["agent-notifications",
+             "ready-made-looks",
              "agent-activity",
              "codex-limits",
              "widget-from-file",
@@ -61,15 +62,23 @@ public class WhatsNewCardsTests
         Assert.Equal(["agent-notifications", "agent-activity", "codex-limits"], Table.Where(c => c.NamesCodex).Select(c => c.Id));
 
     [Fact]
-    public void Release500_ShowsTheNotificationsCard()
+    public void Release500_ShowsTheNotificationsCardAndTheLooksCard()
     {
         var cards = WhatsNew.Cards("4.9.0", "5.0.0");
-        var card = Assert.Single(cards);
-        Assert.Equal("agent-notifications", card.Id);
-        Assert.Equal("Know when your agent is done", card.Title);
-        Assert.StartsWith("A notification, a Desk card or a glow when Claude Code, Codex or another agent finishes a long turn.", card.Body);
-        Assert.Equal(SettingsPage.Notifications, card.Destination);
-        Assert.Equal(SettingsIndex.NotifyAgents, card.Anchor);
+        Assert.Equal(["agent-notifications", "ready-made-looks"], cards.Select(c => c.Id));
+
+        var notify = cards[0];
+        Assert.Equal("Know when your agent is done", notify.Title);
+        Assert.StartsWith("A notification, a Desk card or a glow when Claude Code, Codex or another agent finishes a long turn.", notify.Body);
+        Assert.Equal(SettingsPage.Notifications, notify.Destination);
+        Assert.Equal(SettingsIndex.NotifyAgents, notify.Anchor);
+
+        var looks = cards[1];
+        Assert.Equal("Six looks for your Desk", looks.Title);
+        Assert.Equal("Pick a ready-made look in Settings, Desk and your whole Desk changes in one click, and Put my Desk back undoes it. There's a neon glow for the ink, too.", looks.Body);
+        Assert.Equal(SettingsPage.Desk, looks.Destination);
+        Assert.Equal(SettingsIndex.DeskLooks, looks.Anchor);
+        Assert.False(looks.NamesCodex);
     }
 
     [Fact]

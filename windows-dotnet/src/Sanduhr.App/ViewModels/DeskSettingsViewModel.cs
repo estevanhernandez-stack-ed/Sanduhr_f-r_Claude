@@ -251,6 +251,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             Changed = () => Changed?.Invoke(),
         };
         Designs = new DesignsSettingsViewModel(() => Sanduhr.App.Desk.DeskDesignService.Current);
+        Looks = new DeskLooksViewModel(() => Sanduhr.App.Desk.DeskDesignService.Current);
         Load();
         LoadInk();
         RefreshInkPresets();
@@ -258,6 +259,9 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
 
     /// <summary>Settings, Desk, Designs: the saved designs and Put my Desk back (spec, the agent-designed Desk).</summary>
     public DesignsSettingsViewModel Designs { get; }
+
+    /// <summary>Settings, Desk, Looks: the ready-made looks (5.0 spec 5).</summary>
+    public DeskLooksViewModel Looks { get; }
 
     /// <summary>Desk, Pieces, the Companion row's sprite and roaming (moved from Settings, Widgets).</summary>
     public DeskCompanionViewModel Companion { get; }
@@ -340,6 +344,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(Plate));
         OnPropertyChanged(nameof(DirectDesign));
         Designs.Reload();
+        Looks.Reload();
     }
 
     /// <summary>Slider drags (clock size, margins) settle for this long before they save, so a drag
@@ -385,6 +390,23 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     [ObservableProperty] private string _inkColors = "ffffff";
     [ObservableProperty] private string? _inkPreset;
     [ObservableProperty] private bool _inkShadow = true;
+    [ObservableProperty] private bool _inkGlow;
+
+    /// <summary>The glow's strength as a percentage, 20 to 100: what the slider moves and what a screen reader says.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InkGlowPercentText))]
+    private double _inkGlowPercent = DeskGlow.DefaultStrength * 100;
+
+    public string InkGlowPercentText => Math.Round(InkGlowPercent).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    /// <summary>Neon glow was switched (by its own box, or off by the shadow's): the message's switch follows.</summary>
+    public event Action? InkGlowChanged;
+
+    /// <summary>The line beside the switch when the Desk under the desktop icons draws the glow in one color; null otherwise.</summary>
+    public string? GlowUnderIconsNote =>
+        InkGlow && UnderIcons && Sanduhr.App.Desk.DeskGlowLayer.UnderIconsOneColor
+        && Sanduhr.App.Desk.UnderIcons.UnderIconsHost.Unavailable is null
+            ? SettingsNames.GlowUnderIconsOneColor : null;
 
     public bool IsCustomInk => InkChoice.Mode == DeskInkMode.Custom;
 
@@ -490,6 +512,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             _store.SaveDeskUnderIcons(value);
             OnPropertyChanged();
             OnPropertyChanged(nameof(UnderIconsNote));
+            OnPropertyChanged(nameof(GlowUnderIconsNote));
             Changed?.Invoke();
         }
     }
@@ -505,7 +528,15 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         InkColors = _ink.Color;
         InkPreset = PresetShown();
         InkShadow = _ink.Shadow;
+        InkGlow = _ink.Glow;
+        InkGlowPercent = Math.Round(_ink.GlowStrength * 100);
+        _inkPending = false;   // what was just read is what is saved
         _loadingInk = false;
+        OnPropertyChanged(nameof(GlowUnderIconsNote));
+        // A design or a look can change the glow while the page is open: the message's glow box follows.
+        if (_glowTold == _ink.Glow) return;
+        _glowTold = _ink.Glow;
+        InkGlowChanged?.Invoke();
     }
 
     /// <summary>The Colors row names a preset only while the ink is Custom: Light, Dark and Theme ignore the saved colours.</summary>
@@ -565,12 +596,54 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
         SaveInk(_ink with { Color = spec, Mode = DeskInkMode.Custom });
     }
 
-    partial void OnInkShadowChanged(bool value) => SaveInk(_ink with { Shadow = value });
+    partial void OnInkShadowChanged(bool value)
+    {
+        if (_loadingInk) return;
+        SaveInk(_ink.WithShadow(value));
+        SyncInkSwitches();
+    }
+
+    partial void OnInkGlowChanged(bool value)
+    {
+        if (_loadingInk) return;
+        SaveInk(_ink.WithGlow(value));
+        SyncInkSwitches();
+    }
+
+    partial void OnInkGlowPercentChanged(double value)
+    {
+        if (_loadingInk) return;
+        // A drag settles (SettleFor) before it saves and rebuilds the Desk; the percent text follows the thumb at once.
+        _ink = _ink.WithGlowStrength(value / 100);
+        _inkPending = true;
+        SettleTimer().Stop();
+        _settle!.Start();
+    }
+
+    /// <summary>The glow strength moved in memory and is not saved yet.</summary>
+    private bool _inkPending;
+
+    /// <summary>Glow and shadow are either-or: after one is switched, both boxes show what was saved.</summary>
+    private void SyncInkSwitches()
+    {
+        _loadingInk = true;
+        InkShadow = _ink.Shadow;
+        InkGlow = _ink.Glow;
+        _loadingInk = false;
+        OnPropertyChanged(nameof(GlowUnderIconsNote));
+        if (_glowTold == _ink.Glow) return;
+        _glowTold = _ink.Glow;
+        InkGlowChanged?.Invoke();
+    }
+
+    /// <summary>The glow's value the listeners last heard, so a switch is told once.</summary>
+    private bool _glowTold;
 
     private void SaveInk(DeskInkSettings next)
     {
-        if (_loadingInk || next == _ink) return;
+        if (_loadingInk || (next == _ink && !_inkPending)) return;
         _ink = next;
+        _inkPending = false;   // a settling strength is in `next` already
         _store.SaveDeskInk(next);
         Changed?.Invoke();
     }
@@ -694,19 +767,30 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
     private void SaveSoon(DeskSettings next)
     {
         _pending = next;
+        SettleTimer().Stop();
+        _settle!.Start();
+    }
+
+    private DispatcherTimer SettleTimer()
+    {
         if (_settle is null)
         {
             _settle = new DispatcherTimer(DispatcherPriority.Background) { Interval = SettleFor };
             _settle.Tick += (_, _) => Flush();
         }
-        _settle.Stop();
-        _settle.Start();
+        return _settle;
     }
 
     /// <summary>Saves a pending slider change now (the settle timer, or any other change first).</summary>
     public void Flush()
     {
         _settle?.Stop();
+        if (_inkPending)
+        {
+            _inkPending = false;
+            _store.SaveDeskInk(_ink);
+            Changed?.Invoke();
+        }
         if (_pending is { } p)
         {
             _pending = null;
@@ -721,7 +805,7 @@ public sealed partial class DeskSettingsViewModel : ObservableObject
             // Another change arrives while a slider settles: keep the slider's value too.
             next = next with { TimeSize = pending.TimeSize, Margins = pending.Margins };
             _pending = null;
-            _settle?.Stop();
+            if (!_inkPending) _settle?.Stop();
         }
         _saved = next.Normalized();
         _store.SaveDesk(_saved);

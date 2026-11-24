@@ -575,7 +575,7 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
             Assert.All(children, c => Assert.Equal(System.Windows.Automation.Peers.AutomationControlType.Button, c.GetAutomationControlType()));
             // The separators read as a middle dot (U+00B7), not a mis-decoded "Â·" (the source file must stay UTF-8).
             var dots = links.Children.OfType<TextBlock>().ToList();
-            Assert.Equal(3, dots.Count);
+            Assert.Equal(SettingsIndex.JumpLinks(SettingsPage.Desk).Count - 1, dots.Count);
             Assert.All(dots, d => Assert.Equal("·", d.Text));
         }
         finally { window.Close(); }
@@ -615,11 +615,24 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
         else if (element is ContentElement content) content.MoveFocus(request);
     }
 
-    /// <summary>Done (spec, slice 3): the Desk page reaches Pieces in under 10 Tab stops. Keyboard focus is routed inside the
+    /// <summary>Slice 3 had the Desk page reach Pieces in under 10 Tab stops (9 pinned). Desk Looks spec 5 puts the Looks section above
+    /// Pieces, so the count is now pinned at 11: the Looks jump link makes Pieces the page's second link, and the row of cards is one
+    /// stop (its arrow keys move between the cards). A change to that count shows here. Keyboard focus is routed inside the
     /// never-activating window, as slice 2's Tab walk does.</summary>
     [SkippableFact]
-    public void From_the_Desk_pages_first_stop_Tab_reaches_Pieces_in_under_10() => AppHost.Run(() =>
+    public void From_the_Desk_pages_first_stop_Tab_reaches_Pieces_in_11() => AppHost.Run(() =>
     {
+        // The Looks row is a stop only while it has cards, and the cards come from the design service; another test may have left
+        // one behind or none, so this walk brings its own, as the running app has.
+        var paths = ScratchPaths();
+        using var service = new Desk.DeskDesignService(paths, new Sanduhr.App.Services.SettingsStore(paths))
+        {
+            InstalledFonts = () => ["Segoe UI"],
+            Monitors = () => [],
+            DrawersReviewing = () => false,
+        };
+        var before = Desk.DeskDesignService.Current;
+        Desk.DeskDesignService.Current = service;
         var (window, svm, guard) = Open("Personal");
         try
         {
@@ -644,9 +657,13 @@ public sealed class DeskSplitPagesTests : AppWindowFixture
                 stops++;
             }
             Assert.True(Inside(at, pieces), $"Tab never reached Pieces; it stopped on {at?.GetType().Name ?? "nothing"}");
-            Assert.True(stops == 9, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 9 so a creeping count shows before the spec's 10; the Design it with an AI chat button is one of the stops before it)");
+            Assert.True(stops == 11, $"Pieces is Tab stop {stops} from the page's first stop (pinned at 11, was 9 before the Looks section; spec 5 puts that section above Pieces: its jump link makes Pieces the page's second link, and the row of cards is one stop whose arrow keys move between the cards (Put my Desk back is one more while there is something to put back); a creeping count shows here; the Design it with an AI chat button is one of the stops before it)");
         }
-        finally { window.Close(); }
+        finally
+        {
+            window.Close();
+            Desk.DeskDesignService.Current = before;
+        }
     });
 
     [Fact]

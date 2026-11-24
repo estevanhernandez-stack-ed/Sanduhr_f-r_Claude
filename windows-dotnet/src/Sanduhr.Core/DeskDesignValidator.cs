@@ -165,6 +165,20 @@ public sealed partial record DeskDesign
 
     // -- contrast -----------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// The contrast rule alone, for a caller that fits a design to a wallpaper before it is proposed (a ready-made look,
+    /// <c>DeskLookFit</c>): the reasons <see cref="Validate(JsonNode?, DeskDesignContext)"/> would give for
+    /// <paramref name="proposal"/>'s ink over <paramref name="ctx"/>'s wallpaper, judged as it would look merged over
+    /// <see cref="DeskDesignContext.Current"/>. Empty when every piece reads, when the ink is automatic, and when there is no
+    /// wallpaper summary. One implementation: this is <see cref="CheckContrast"/> itself.
+    /// </summary>
+    internal static IReadOnlyList<DeskReason> ContrastReasons(DeskDesign proposal, DeskDesignContext ctx)
+    {
+        var reasons = new List<DeskReason>();
+        CheckContrast(proposal, ctx, reasons);
+        return reasons;
+    }
+
     private static void CheckContrast(DeskDesign proposal, DeskDesignContext ctx, List<DeskReason> reasons)
     {
         if (ctx.Wallpaper is not { Monitors.Count: > 0 } wall) return;

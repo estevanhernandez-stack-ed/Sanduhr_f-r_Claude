@@ -17,6 +17,13 @@ public sealed record SettingsGroup(string? Title, IReadOnlyList<SettingsPage> Pa
 /// </summary>
 public static class SettingsNames
 {
+    // ---- Slim scroll bar (its invisible track buttons are controls, so they read as words) ----
+
+    public const string ScrollPageUp = "Page up";
+    public const string ScrollPageDown = "Page down";
+    public const string ScrollPageLeft = "Page left";
+    public const string ScrollPageRight = "Page right";
+
     // ---- Local burn ledger (spec 3) ----
 
     /// <summary>A stacked project row whose sessions come from more than one agent.</summary>
@@ -1126,6 +1133,11 @@ public static class SettingsNames
     /// <summary>Now playing's first jump link (its section is "Show what's playing in the widget").</summary>
     public const string NowPlayingJumpWidget = "In the widget";
 
+    /// <summary>Desk: the ready-made looks section (5.0 spec 5).</summary>
+    public const string LooksSection = "Looks";
+    public const string LooksRowName = "Ready-made looks";
+    public const string OnYourDesk = "On your Desk";
+    public const string LooksCaption = "Pick one and your whole Desk changes. Put my Desk back undoes it. Your Launcher buttons, your messages and your weather place stay as they are.";
     /// <summary>Desk: the piece rows' section (was "Where each piece sits").</summary>
     public const string PiecesSection = "Pieces";
     /// <summary>Desk: the clicks switch and the sign-in reminders.</summary>
@@ -1167,6 +1179,11 @@ public static class SettingsNames
     public const string UseThemeColorsCaption =
         "The message draws in your widget theme's message colors and glow, the same as the rest of the Desk. Your own colors and any colored lines are kept for when you turn this off.";
     public const string DropShadow = "Drop shadow under the text";
+    public const string NeonGlow = "Neon glow";
+    public const string GlowStrength = "Glow strength";
+    public const string NeonGlowCaption = "A soft light behind the Desk's text and meters, in the ink's own colors. It takes the place of the drop shadow, and it stays on while the Desk follows the widget theme.";
+    public const string CoveredByNeonGlow = "Covered by Neon glow.";
+    public const string GlowUnderIconsOneColor = "Under the desktop icons the glow is one color.";
 
     // ---- One theme for the widget and the Desk (theme match) ----
     /// <summary>Desk Look's first section (theme match).</summary>

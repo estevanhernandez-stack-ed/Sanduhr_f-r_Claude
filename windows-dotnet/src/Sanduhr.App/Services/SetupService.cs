@@ -24,6 +24,8 @@ internal interface ISetupHost
     string? SortNow();
     void SetUsage(bool on);
     void ReloadDesk();
+    /// <summary>Applies a ready-made look (5.0 spec 5). Null when it is on the Desk; otherwise the line that says why not.</summary>
+    string? ApplyLook(string id);
 }
 
 /// <summary>Turning drawers off: whether they are off now, and the line to show (null for a plain yes or a plain no).</summary>
@@ -32,7 +34,7 @@ internal sealed record SetupDrawersOff(bool Off, string? Line);
 internal sealed record SetupResult(SetupChoices Now, IReadOnlyList<string> Lines, bool ReviewOpened);
 
 /// <summary>Applies the setup screen's ticks one thing at a time (spec 2, Continue): drawers off first (it can be refused), then the
-/// saved choices and the Desk, drawers on, usage, one Desk reload, and last the first drawers review.</summary>
+/// saved choices and the Desk, drawers on, usage, one Desk reload, a picked look, and last the first drawers review.</summary>
 internal sealed class SetupService(SettingsStore store, ISetupHost host)
 {
     public SetupChoices Current()
@@ -83,6 +85,9 @@ internal sealed class SetupService(SettingsStore store, ISetupHost host)
             lines.Add(DrawerReview.FirstOnLine);   // the Drawers page says this when it turns drawers on
         }
         host.ReloadDesk();
+        // A look picked on the setup screen (5.0 spec 5): after the Desk is on, and before the first drawers review opens,
+        // which would refuse it.
+        if (now.Desktop && now.Look is { } look && host.ApplyLook(look) is { } lookSaid) lines.Add(lookSaid);
 
         // The first review is for drawers just turned on, and only while no rules plan was ever accepted.
         bool review = false;
@@ -136,6 +141,13 @@ internal sealed class AppSetupHost(Func<DrawerService?> drawers, Func<DrawerRevi
     public void SetUsage(bool on) => widget.SetUsageOn(on);
 
     public void ReloadDesk() => desk()?.Reload();
+
+    public string? ApplyLook(string id)
+    {
+        if (Sanduhr.App.Desk.DeskDesignService.Current is not { } designs) return null;   // no Desk service: nothing to apply to
+        var result = designs.ApplyLook(id);
+        return result.Ok ? null : result.Message;   // streamer: notname - fixed copy and a built-in look's name, never the user's text
+    }
 
     /// <summary>What a return said, as the Drawers page words it: the failure alone, else the result line (counts only while streamer mode
     /// is on) and what had to stay. Null when it had nothing to say.</summary>

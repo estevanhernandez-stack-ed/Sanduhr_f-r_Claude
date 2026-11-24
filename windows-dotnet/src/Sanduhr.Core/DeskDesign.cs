@@ -29,6 +29,18 @@ public sealed record DeskInkChoice(DeskInkKind Kind, IReadOnlyList<string> Color
 /// follows the link; the review bar only shows it.</summary>
 public sealed record DeskFontChoice(string Family, string? Link = null);
 
+/// <summary>A design's neon glow (5.0 spec 5): off, on at the strength the Desk already has (<see cref="Strength"/> null), or on
+/// at a strength from 0.2 to 1.0. In JSON: <c>false</c>, <c>true</c>, or the number.</summary>
+public sealed record DeskGlowChoice(bool On, double? Strength = null)
+{
+    public static DeskGlowChoice Off { get; } = new(false);
+
+    /// <summary>The words the "what changed" list uses.</summary>
+    public string Describe() => !On ? "off"
+        : Strength is { } s ? "on at " + Math.Round(s * 100).ToString("0", CultureInfo.InvariantCulture) + "%"
+        : "on";
+}
+
 /// <summary>One piece's part of a design's layout. Every member but <see cref="Piece"/> is optional: absent leaves the
 /// current value alone. A hidden piece has no anchor, no size, no monitor and no tilt. <c>Monitor</c> is "all", "main" or a monitor id.
 /// <c>Tilt</c> is the fold (#314), whole degrees from -20 to 20, and belongs to the piece's stack: every piece at that anchor
@@ -68,7 +80,7 @@ public sealed record DeskParse(DeskDesign? Design, IReadOnlyList<DeskReason> Rea
 /// JSON, snake_case: <c>name</c>, <c>note</c>, <c>layout</c> ({piece: {anchor, size, hidden, monitor, tilt, style}}), <c>weather</c>
 /// ({nickname}), <c>font</c> (a family, or
 /// {family, link}), <c>ink</c> ("auto", "light", "dark", "theme", one #hex, or two to four #hex), <c>plate</c>,
-/// <c>shadow</c>, <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}), <c>theme</c> (a widget
+/// <c>shadow</c>, <c>glow</c> (false, true, or a strength from 0.2 to 1; on with <c>shadow</c> true is refused), <c>launcher</c> ({orientation, buttons[]}), <c>messages</c> ({lines[], mode}), <c>theme</c> (a widget
 /// theme object) and <c>follows_theme</c> (true draws the Desk in the theme's own look). <c>looks</c> is a list of per-song looks (<see cref="NowPlayingLookCheck"/>): they are saved with the design
 /// and never become part of the Desk it reads back.
 /// </summary>
@@ -95,6 +107,8 @@ public sealed partial record DeskDesign
     public DeskInkChoice? Ink { get; init; }
     public bool? Plate { get; init; }
     public bool? Shadow { get; init; }
+    /// <summary>The neon glow; null leaves it alone. Glow on and <see cref="Shadow"/> true cannot both be asked for.</summary>
+    public DeskGlowChoice? Glow { get; init; }
     public LauncherModel? Launcher { get; init; }
     public DeskMessagesChange? Messages { get; init; }
     public JsonObject? Theme { get; init; }
@@ -107,7 +121,7 @@ public sealed partial record DeskDesign
     public bool? FollowsTheme { get; init; }
 
     private static readonly string[] Fields =
-        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "launcher", "messages", "looks", "theme", "follows_theme"];
+        ["name", "note", "layout", "weather", "font", "ink", "plate", "shadow", "glow", "launcher", "messages", "looks", "theme", "follows_theme"];
 
     /// <summary>The design's field names, read-only: the words <see cref="Parse"/> accepts at the top level.</summary>
     public static IReadOnlyList<string> FieldNames => Fields;
@@ -143,6 +157,9 @@ public sealed partial record DeskDesign
         var ink = ParseInk(o["ink"], r);
         bool? plate = Bool(o, "plate", r);
         bool? shadow = Bool(o, "shadow", r);
+        var glow = ParseGlow(o["glow"], r);
+        if (glow is { On: true } && shadow == true)
+            r.Add(new DeskReason("glow", "cannot be on while shadow is true: the Desk draws one or the other. Send shadow: false with it, or leave shadow out."));
         bool? followsTheme = Bool(o, "follows_theme", r);
         var launcher = ParseLauncher(o["launcher"], r);
         var messages = ParseMessages(o["messages"], r);
@@ -160,7 +177,7 @@ public sealed partial record DeskDesign
         if (r.Count > 0) return new DeskParse(null, r.Take(40).ToList(), warnings);
         return new DeskParse(new DeskDesign
         {
-            Name = name, Note = note, Layout = layout, Font = font, Ink = ink, Plate = plate, Shadow = shadow,
+            Name = name, Note = note, Layout = layout, Font = font, Ink = ink, Plate = plate, Shadow = shadow, Glow = glow,
             Launcher = launcher, Messages = messages, Theme = theme, Looks = looks, Weather = weather, FollowsTheme = followsTheme,
         }, [], warnings);
     }
@@ -217,6 +234,16 @@ public sealed partial record DeskDesign
         if (o[key] is not { } n) return null;
         if (n is JsonValue v && v.TryGetValue<bool>(out var b)) return b;
         r.Add(new DeskReason(key, "must be true or false"));
+        return null;
+    }
+
+    private static DeskGlowChoice? ParseGlow(JsonNode? node, List<DeskReason> r)
+    {
+        if (node is null) return null;
+        if (node is JsonValue v && v.TryGetValue<bool>(out var on)) return new DeskGlowChoice(on);
+        if (TryNumber(node, out var s) && s >= DeskGlow.MinStrength - 1e-9 && s <= DeskGlow.MaxStrength + 1e-9)
+            return new DeskGlowChoice(true, DeskGlow.Clamp(s));
+        r.Add(new DeskReason("glow", $"must be true, false, or a strength from {DeskGlow.MinStrength.ToString(CultureInfo.InvariantCulture)} to {DeskGlow.MaxStrength.ToString("0", CultureInfo.InvariantCulture)}"));
         return null;
     }
 
@@ -605,6 +632,8 @@ public sealed partial record DeskDesign
         }
         if (Plate is { } plate) o["plate"] = plate;
         if (Shadow is { } shadow) o["shadow"] = shadow;
+        if (Glow is { } glow)
+            o["glow"] = !glow.On ? JsonValue.Create(false) : glow.Strength is { } strength ? JsonValue.Create(strength) : JsonValue.Create(true);
         if (Launcher is not null) o["launcher"] = Launcher.ToJson();
         if (Messages is not null)
         {
@@ -644,6 +673,14 @@ public sealed partial record DeskDesign
             arr.Place(LauncherModel.Widget, arr.FirstFreeAnchor());
             layout = FromArrangement(arr);
         }
+        // Glow and shadow are either-or: what the proposal turns on turns the other off. "glow: true" keeps the strength there is.
+        var glow = proposal.Glow ?? current?.Glow;
+        if (proposal.Glow is { On: true, Strength: null } && current?.Glow is { On: true, Strength: { } kept })
+            glow = new DeskGlowChoice(true, kept);
+        var shadow = proposal.Shadow ?? current?.Shadow;
+        if (proposal.Glow is { On: true }) shadow = false;
+        else if (proposal.Shadow == true && glow is { On: true }) glow = DeskGlowChoice.Off;
+
         return new DeskDesign
         {
             Name = proposal.Name ?? current?.Name,
@@ -652,7 +689,8 @@ public sealed partial record DeskDesign
             Font = proposal.Font ?? current?.Font,
             Ink = proposal.Ink ?? current?.Ink,
             Plate = proposal.Plate ?? current?.Plate,
-            Shadow = proposal.Shadow ?? current?.Shadow,
+            Shadow = shadow,
+            Glow = glow,
             Launcher = launcher,
             Messages = proposal.Messages ?? current?.Messages,
             Theme = proposal.Theme ?? current?.Theme,
@@ -763,6 +801,8 @@ public sealed partial record DeskDesign
             lines.Add(a.Ink is null ? $"Ink: {ink.Describe()}" : $"Ink: {a.Ink.Describe()} to {ink.Describe()}");
         if (b.Plate is { } plate && a.Plate != plate) lines.Add($"Plate behind the text: {(plate ? "on" : "off")}");
         if (b.Shadow is { } shadow && a.Shadow != shadow) lines.Add($"Text shadow: {(shadow ? "on" : "off")}");
+        if (b.Glow is { } neon && (a.Glow ?? DeskGlowChoice.Off).Describe() != neon.Describe())
+            lines.Add($"Neon glow: {neon.Describe()}");
         if (b.FollowsTheme is { } follows && (a.FollowsTheme ?? false) != follows)
             lines.Add($"Desk follows the widget theme: {(follows ? "on" : "off")}");
         if (b.Launcher is { } launcher && (a.Launcher is null || a.Launcher.ToJson().ToJsonString() != launcher.ToJson().ToJsonString()))

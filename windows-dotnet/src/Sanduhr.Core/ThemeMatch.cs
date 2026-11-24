@@ -97,7 +97,7 @@ public static partial class ThemeMatch
     }
 
     /// <summary>
-    /// What Match now (and Follow off) write into the Desk's own settings: the ink's stops as a Custom ink with its shadow on, the font
+    /// What Match now (and Follow off) write into the Desk's own settings: the ink's stops as a Custom ink with its shadow on, or with the neon glow kept when the Desk has it on (the two are either-or), the font
     /// (the Desk keeps its own when the look has none or this PC lacks it; <paramref name="fontAvailable"/> null = present), the plate, the message's colors with its glow on, and gradient bars. The plate
     /// tint, shadow shade and glow color have no Desk setting, so they draw as before once the Desk has its own look again.
     /// </summary>
@@ -107,7 +107,9 @@ public static partial class ThemeMatch
             Font = look.Font is { } f && (fontAvailable?.Invoke(f) ?? true) ? DeskDesignApply.FontSetting(new DeskFontChoice(f)) : desk.Font,
             Plate = look.Plate,
         },
-        ink with { Mode = DeskInkMode.Custom, Color = string.Join(",", look.Ink), Shadow = true },
+        ink.Glow
+            ? ink with { Mode = DeskInkMode.Custom, Color = string.Join(",", look.Ink) }
+            : (ink with { Mode = DeskInkMode.Custom, Color = string.Join(",", look.Ink) }).WithShadow(true),
         message with { Color = string.Join(",", look.Message), Glow = true },
         np with { BarsGradient = true });
 }

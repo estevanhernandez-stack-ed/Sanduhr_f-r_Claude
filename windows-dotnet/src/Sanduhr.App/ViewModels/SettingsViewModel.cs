@@ -281,6 +281,9 @@ public sealed class SettingsViewModel : System.ComponentModel.INotifyPropertyCha
         // Each feature page says where its Desk piece sits and can place it (Settings v2, Principle 1): one line per piece,
         // reading and writing the same desk_layout as Desk, Pieces.
         MessagePage.Piece = Desk.PieceStatus("message");
+        // Neon glow covers the message's own glow (5.0 spec 5): the message's box on Desk Look follows the switch.
+        Desk.InkGlowChanged += () => MessagePage.SetNeonGlow(Desk.InkGlow);
+        MessagePage.SetNeonGlow(Desk.InkGlow);
         NowPlayingPage.Piece = Desk.PieceStatus("nowPlaying");
         WeatherPage.Piece = Desk.PieceStatus("weather");
         // The glow's spot is placed by the Claude Code page through its own store: the Desk page reads it again (App replaces this

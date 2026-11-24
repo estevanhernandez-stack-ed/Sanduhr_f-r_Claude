@@ -1,10 +1,34 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Sanduhr.App.Desk;
 using Sanduhr.App.Services;
 using Sanduhr.Core;
 
 namespace Sanduhr.App.ViewModels;
+
+/// <summary>One look in setup's "Start with a look" row: the gallery's card, picked or not. Picking is a choice, like a tick: nothing
+/// changes until Continue.</summary>
+internal sealed partial class SetupLookViewModel : ObservableObject
+{
+    private readonly Action<SetupLookViewModel> _pick;
+
+    internal SetupLookViewModel(DeskLookCardViewModel card, Action<SetupLookViewModel> pick)
+    {
+        Card = card;
+        _pick = pick;
+    }
+
+    public DeskLookCardViewModel Card { get; }
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(AccessibleName))] private bool _picked;
+
+    /// <summary>"Marquee look. Clock up top, neon glow. Picked." No notes here: the gallery in Settings carries those.</summary>
+    public string AccessibleName => $"{Card.Name} look. {Card.Blurb} {(Picked ? "Picked." : "Not picked.")}";
+
+    [RelayCommand]
+    private void Pick() => _pick(this);
+}
 
 /// <summary>Set up Sanduhr (setup spec, sections 2 and 4): three ticks, the lines a change says, Continue and Not now or Cancel.
 /// Streamer mode: nothing here draws a name, path or usage; the lines are fixed copy and the host masks any path it returns.</summary>
@@ -18,7 +42,8 @@ internal sealed partial class SetupViewModel : ObservableObject
     /// screen was up) means usage is wanted: it is ticked when the window opens, and again at Continue if the person never touched that tick.</param>
     /// <param name="codexInstalled">Whether Codex is on this PC; a Codex tick is greyed without it (one already ticked can still be cleared).
     /// Defaults to looking for a Codex home.</param>
-    internal SetupViewModel(SetupService service, bool firstRun, Func<bool>? hasAccount = null, Func<bool>? codexInstalled = null)
+    internal SetupViewModel(SetupService service, bool firstRun, Func<bool>? hasAccount = null, Func<bool>? codexInstalled = null,
+        Func<DeskDesignService?>? looks = null)
     {
         _service = service;
         _hasAccount = hasAccount ?? (() => false);
@@ -30,7 +55,47 @@ internal sealed partial class SetupViewModel : ObservableObject
         _drawers = now.Drawers;
         _claudeUsage = now.ClaudeUsage || (firstRun && _hasAccount());
         _codexUsage = now.CodexUsage;   // the saved tick: a setup save that never touched Codex keeps it
+        LoadLooks(looks?.Invoke());
         Refresh();
+    }
+
+    /// <summary>The ready-made looks to start with (5.0 spec 5): empty where there is no Desk service to fit them.</summary>
+    public ObservableCollection<SetupLookViewModel> Looks { get; } = [];
+    public bool HasLooks => Looks.Count > 0;
+
+    /// <summary>The row is live only while "A nicer desktop" is ticked: a look is a Desk.</summary>
+    public bool LooksEnabled => Desktop;
+
+    /// <summary>The picked look's id, null for none.</summary>
+    public string? PickedLook => Looks.FirstOrDefault(l => l.Picked)?.Card.Id;
+
+    private void LoadLooks(DeskDesignService? service)
+    {
+        if (service is null) return;
+        try
+        {
+            var snapshot = service.LooksSnapshot();
+            var picture = service.LookPicture();
+            string backdrop = InkHex.Normalize(snapshot.Wallpaper?.Dominant.FirstOrDefault()?.Hex) ?? "";
+            foreach (var data in snapshot.Cards)
+            {
+                var card = new DeskLookCardViewModel(data.Look.Id, _ => { });
+                card.Update(data, picture, backdrop, snapshot.Wallpaper?.Brightness);
+                Looks.Add(new SetupLookViewModel(card, Toggle));
+            }
+        }
+        catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Looks.Clear();   // setup without the row is setup as it always was
+        }
+    }
+
+    /// <summary>Picking a card marks it; picking it again clears it; one at a time.</summary>
+    private void Toggle(SetupLookViewModel look)
+    {
+        bool pick = !look.Picked;
+        foreach (var l in Looks) l.Picked = pick && ReferenceEquals(l, look);
+        OnPropertyChanged(nameof(PickedLook));
     }
 
     /// <summary>A first run (or no setup saved yet): the default ticks and Not now. Otherwise the ticks show what is on, with Cancel.</summary>
@@ -69,7 +134,11 @@ internal sealed partial class SetupViewModel : ObservableObject
     /// that says Claude (the add-ons line names Claude Code with usage unticked).</summary>
     public bool ShowTrademark => ClaudeUsage || ChangeLines.Any(l => l.Contains("Claude", StringComparison.Ordinal));
 
-    partial void OnDesktopChanged(bool value) => Refresh();
+    partial void OnDesktopChanged(bool value)
+    {
+        OnPropertyChanged(nameof(LooksEnabled));
+        Refresh();
+    }
     partial void OnDrawersChanged(bool value) => Refresh();
     partial void OnCodexUsageChanged(bool value)
     {
@@ -87,7 +156,7 @@ internal sealed partial class SetupViewModel : ObservableObject
         ContinueCommand.NotifyCanExecuteChanged();
     }
 
-    private SetupChoices Choices => new(Desktop, Drawers, ClaudeUsage, CodexUsage);
+    private SetupChoices Choices => new(Desktop, Drawers, ClaudeUsage, CodexUsage, Desktop ? PickedLook : null);
 
     private void Refresh()
     {

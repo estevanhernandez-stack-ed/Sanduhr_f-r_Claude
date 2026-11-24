@@ -19,6 +19,8 @@ public static class SetupCopy
     public const string DesignWithChat = "Design it with an AI chat";
     /// <summary>Under the button on the setup screen and the Drawers page: what the chat does, in a line.</summary>
     public const string DesignWithChatCaption = "Tell any AI chat what you like and paste back its design.";
+    public const string StartWithALook = "Start with a look";
+    public const string StartWithALookCaption = "Pick one and Continue puts it on your Desk. You can change it, or put your Desk back, in Settings, Desk.";
     public const string Continue = "Continue";
     public const string NotNow = "Not now";
     public const string Cancel = "Cancel";
@@ -115,7 +117,7 @@ public static class SetupCopy
     public static IReadOnlyList<string> All { get; } =
     [
         Title, Intro, DesktopTitle, DesktopBody, DrawersTitle, DrawersBody, UsageTitle, UsageBody, ClaudeSource, CodexSource, CodexTrademark, CodexNotInstalled, ClaudeTrademark,
-        DesignWithChat, DesignWithChatCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, CodexOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
+        DesignWithChat, DesignWithChatCaption, StartWithALook, StartWithALookCaption, Continue, NotNow, Cancel, MenuItem, PickOne, SaveFailed, WhatChanges, WhatHappened, DesktopOffLine, UsageOffLine, CodexOffLine, AddOnsStayLine, ArrangeNeedsDesktop, DesignDesktopOffNote, DrawersOffLine(2),
         ChatIntro, ChatCopyPrompt, ChatPasteName, ChatPastePlaceholder, ChatPreview, ChatUseRules, ChatUseDrawerSettings, ChatClose, ChatFindingsName, ChatReady,
         ChatPromptCopied, ChatDeskShown, ChatRulesShown, ChatNoDeskService, ChatRulesSavedNothing, ChatUntitledDesign, ChatFixCount(1), ChatFixCount(2), ChatManyBlocks(2),
         ChatRulesLine(1, ["Photos"]), ChatRulesLine(2, ["Photos", "Receipts"]), ChatNotShown("the Desk is busy"),
