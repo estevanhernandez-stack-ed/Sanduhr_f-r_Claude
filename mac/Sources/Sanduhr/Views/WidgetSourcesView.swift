@@ -140,8 +140,8 @@ struct SourceHeaderTrailing: View {
     }
 }
 
-/// Codex's cards: the same meters, pace and burn as Claude's, dimmed when stale. No limit menu (its
-/// items are Claude's), no local burn (that is Claude Code's), no sparkline yet.
+/// Codex's cards: the same meters, pace, burn and sparkline as Claude's, dimmed when stale. No limit
+/// menu (its items are Claude's), no local burn (that is Claude Code's).
 struct CodexCardStack: View {
     let cards: [WidgetSourceCard]
     let palette: Theme.Palette
@@ -152,7 +152,7 @@ struct CodexCardStack: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(cards, id: \.tier) { card in
-                TierCardView(tier: card.tier, usage: card.usage, history: [], palette: palette, tick: tick,
+                TierCardView(tier: card.tier, usage: card.usage, history: card.history, palette: palette, tick: tick,
                              pinDeepMath: pinDeepMath, sparklineMode: sparklineMode,
                              label: card.label, spokenLabel: card.spokenLabel, stale: card.stale)
                     .opacity(card.stale ? SourceBar.staleOpacity : 1)

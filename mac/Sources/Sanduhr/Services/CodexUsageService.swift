@@ -78,6 +78,9 @@ final class CodexUsageService {
     private(set) var emptyState: EmptyState?
     /// Polling (Codex on, not demo, not reset).
     private(set) var running = false
+    /// What the cards' sparklines draw: the recent window of `history.@codex.json`, handed over by the
+    /// recorder (`setSparklines`). Empty with no history, and after a stop.
+    private(set) var sparklines: HistoryStore.History = [:]
 
     /// Called after every read that landed: the reading, or nil when there are no limits to draw
     /// (not installed, nothing logged yet, unreadable). Not called by `stop`.
@@ -134,6 +137,11 @@ final class CodexUsageService {
         poll()
     }
 
+    /// The recorder's current sparklines; assigns only a change, so the widget redraws on a real one.
+    func setSparklines(_ history: HistoryStore.History) {
+        if sparklines != history { sparklines = history }
+    }
+
     /// Stops polling and clears what it published. A tick or read from before returns without IO.
     func stop() {
         let wasRunning = running
@@ -143,6 +151,7 @@ final class CodexUsageService {
         inFlight = false
         cache = CodexReadCache()
         set(usage: nil, asOf: nil, freshness: nil, freshTiers: [], plan: nil, empty: nil)
+        setSparklines([:])
         if wasRunning { onStop?() }
     }
 

@@ -34,7 +34,9 @@ struct StatuslineChips: Equatable, Sendable {
     private(set) var separators: [StatuslineSeparator?]
     private(set) var dropped: Set<String> = []
     var keepNew = true
-    private(set) var mine: [SanduhrSegment] = SanduhrSegment.defaults
+    /// What shows now, Codex included when the script would show it (a list written before the chip
+    /// shows it beside session or weekly), so the chip reads true.
+    private(set) var mine: [SanduhrSegment] = StatuslineSelection().shown
     /// The glyph the final line joins segments with; nil keeps their own separators.
     var joinWith: StatuslineJoinGlyph?
     /// Looks set per segment: theirs by matcher, Sanduhr's by name.
@@ -98,12 +100,14 @@ struct StatuslineChips: Equatable, Sendable {
     /// Sanduhr's chips, in the order they print.
     var mineChips: [Chip] {
         let texts = Dictionary(inspection.mine.map { ($0.name, $0.text) }, uniquingKeysWith: { a, _ in a })
-        // The last segment besides the label stays: the label alone prints nothing.
-        let last = mine.filter { $0 != .label }.count == 1
+        // The last segment besides the label and Codex stays: the label alone prints nothing, and
+        // Codex's meters come and go with its snapshot, so they can't be what a line rests on.
+        let others = mine.filter { $0 != .label && $0 != .codex }.count
         return SanduhrSegment.allCases.map { s in
             let kept = mine.contains(s)
+            let enabled = s == .codex ? !(kept && others == 0) : !(kept && others == 1 && s != .label)
             return Chip(id: "sanduhr-\(s.rawValue)", source: .sanduhr, label: texts[s.rawValue].flatMap { $0.isEmpty ? nil : $0 } ?? s.title,
-                        key: s.rawValue, kept: kept, enabled: !(kept && last && s != .label), name: s.title,
+                        key: s.rawValue, kept: kept, enabled: enabled, name: s.title,
                         styled: !(ourStyles[s]?.isEmpty ?? true))
         }
     }
@@ -111,7 +115,7 @@ struct StatuslineChips: Equatable, Sendable {
     /// The picks a written command carries, back on the chips (Mods & Config's Statusline edits
     /// what is there). Their separators line up with the lines as they run now.
     mutating func load(_ selection: StatuslineSelection) {
-        mine = selection.mine ?? SanduhrSegment.defaults
+        mine = selection.shown
         let picks = selection.theirs ?? StatuslinePicks()
         dropped = Set(picks.drop)
         keepNew = picks.keepNew
@@ -201,7 +205,19 @@ struct StatuslineChips: Equatable, Sendable {
 
     /// What the command carries: nothing for a choice that changes nothing.
     var selection: StatuslineSelection {
-        StatuslineSelection(theirs: theirs, mine: mine == SanduhrSegment.defaults ? nil : mine)
+        StatuslineSelection(theirs: theirs, mine: wire.mine, codexOff: wire.codexOff)
+    }
+
+    /// `--mine` as written. Codex on beside session or weekly is what a list without the name already
+    /// means, so it is left out and an older command reads the same; on without them it is named;
+    /// off beside them takes the `nocodex` marker. The defaults (Codex on) write nothing.
+    private var wire: (mine: [SanduhrSegment]?, codexOff: Bool) {
+        let rest = mine.filter { $0 != .codex }
+        let implied = rest.contains(.session) || rest.contains(.weekly)
+        let on = mine.contains(.codex)
+        if on && !implied { return (SanduhrSegment.allCases.filter(mine.contains), false) }
+        if !on && implied { return (rest, true) }
+        return (rest == SanduhrSegment.defaults ? nil : rest, false)
     }
 
     /// What the preview composes with: the command's picks, or, when those are empty, the split

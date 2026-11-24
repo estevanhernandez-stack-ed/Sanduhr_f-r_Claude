@@ -34,6 +34,19 @@
 - **A widget pack zip you made yourself installs.** Install widget from file… now reads the zips Explorer's Send to, Compressed folder, Finder's Compress and zip tools make: compressed, with the pack's folder inside (its name may have spaces, as Finder and Explorer keep it), or with a Mac's hidden `__MACOSX` and `.DS_Store` files, which are skipped. It still holds every file to the same size limits while unpacking, checks each one's checksum, and runs every pack rule, so a zip that fails installs nothing and says why. Packs from the catalog keep their own stricter format (#459).
 - **Installing the MCP server checks that it starts.** After Install in Settings ▸ Claude Code, Sanduhr starts the server the way Claude Code will and waits for it to answer, then says so: installed and answering, with its version, or installed but not starting, and why (its launcher is missing, the server file it points to is gone, it stopped at once or didn't answer). Before, a launcher that couldn't start looked to Claude Code like no server at all, and nothing said otherwise (#144).
 
+## Unreleased (mac)
+
+### New
+
+- **A sparkline on Codex's cards.** The widget's Codex section draws the same sparkline Claude's cards do, from Codex's own history. It follows the meter history switch for Codex, and demo mode draws a made-up one. Claude's sparklines are unchanged.
+- **A Codex limit pulses the Desk.** When a Codex alert fires with the Desk in Alerts' delivery, the Desk meters that show Codex pulse: a meter piece set to Codex, or a Combined piece whose row carries Codex. A Claude-only piece never pulses for Codex. With Desk-only delivery and no piece that shows Codex, the alert stays a banner so it doesn't go quiet. Combined meters now pulse for Claude's alerts too. Quiet hours still hold pulses, and a Mac with only Claude pulses exactly as before.
+- **A Codex chip in Combine.** The segment picker has a Codex chip (`cx 5h 40% wk 12%`), written as `codex` in the statusline's `--mine` list, with `nocodex` to turn it off on its own. An older combined statusline keeps its output byte for byte: with neither name in its list, Codex shows when Session or Weekly does, as before. A sheet with Session and Weekly dropped now keeps Codex until its chip is switched off. Update the statusline in Settings ▸ Claude Code to get the new script.
+- **Trends includes every agent.** The Usage page's Trends tab counts Codex and the Antigravity CLI beside Claude Code, as Overview and Sessions do: the weekly bars stack by agent in the source colors with a legend, each agent's total is in the chart's accessible name, and top projects merge by name with each agent's share. A week reads "no record" only when every source that counted has a gap in it. With Claude Code alone, Trends is unchanged. Skills stays Claude Code's.
+
+### Changed
+
+- **The Claude Code piece is called "Claude Code hook".** It was "Claude Code glow hook" in Settings, the Install question and Notifications. Settings search still finds it by "glow", and the Install question now reads "Let Claude Code tell Sanduhr when it finishes or needs you?", since the hook notifies, shows a Desk card and glows.
+
 ## v2.47.1-mac — 2026-11-23
 
 ### Fixes

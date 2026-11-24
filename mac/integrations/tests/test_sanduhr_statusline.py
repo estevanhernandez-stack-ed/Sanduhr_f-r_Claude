@@ -971,13 +971,166 @@ class CodexSegmentTests(unittest.TestCase):
         p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--band"], session_json())
         self.assertEqual(p.stdout.decode(), "mine\ncx 5h 40% wk 12%\n")
 
-    def test_inspect_still_lists_only_the_segments_it_always_did(self):
+    def test_inspect_gives_the_codex_chip_its_own_entry_and_the_others_no_cx(self):
         self.r.fresh()
         self.codex()
         p, _ = self.r.run(["--inspect-b64", ""])
         d = json.loads(p.stdout.decode())
         self.assertEqual([m["name"] for m in d["mine"]], list(sl.MINE))
-        self.assertNotIn("cx", json.dumps(d["mine"]))
+        texts = {m["name"]: m["text"] for m in d["mine"]}
+        self.assertEqual(texts["codex"], "cx 5h 40% wk 12%")
+        self.assertNotIn("cx", json.dumps([m for m in d["mine"] if m["name"] != "codex"]))
+
+    def test_inspect_without_a_codex_snapshot_leaves_the_chip_text_empty(self):
+        self.r.fresh()
+        p, _ = self.r.run(["--inspect-b64", ""])
+        texts = {m["name"]: m["text"] for m in json.loads(p.stdout.decode())["mine"]}
+        self.assertEqual(texts["codex"], "")
+
+
+class CodexChipTests(unittest.TestCase):
+    """The Codex chip in Combine (2.48, item 3): `codex` and `nocodex` are `--mine` names. A list
+    without either keeps the 2.46 rule (cx rides with session and weekly), so every older command
+    prints what it printed before. Made-up numbers, temp folders."""
+
+    CX = "cx 5h 40% wk 12%"
+
+    def setUp(self):
+        self.r = Rig()
+        self.r.fresh()
+        now = datetime.now(timezone.utc)
+        body = {"schema_version": 1, "writer_version": "2.46.0", "source": "codex",
+                "captured_at": iso(now - timedelta(seconds=10)), "plan": "Pro", "status": "ok",
+                "error_kind": None, "tiers": [
+                    {"key": "five_hour", "utilization": 40, "resets_at": iso(now + timedelta(hours=3))},
+                    {"key": "seven_day", "utilization": 12, "resets_at": iso(now + timedelta(days=5))}]}
+        with open(self.r.path("snapshot.codex.json"), "w", encoding="utf-8") as f:
+            json.dump(body, f)
+
+    def tearDown(self):
+        self.r.close()
+
+    def combined(self, mine=None, *extra, join="line"):
+        args = ["--chain-b64", b64("echo mine"), "--join", join]
+        if mine is not None:
+            args += ["--mine", mine]
+        args += list(extra)
+        p, _ = self.r.run(args, session_json())
+        self.assertEqual(p.returncode, 0)
+        return p.stdout.decode()
+
+    def without_codex_file(self, mine=None, *extra):
+        if os.path.exists(self.r.path("snapshot.codex.json")):
+            os.remove(self.r.path("snapshot.codex.json"))
+        return self.combined(mine, *extra)
+
+    # Fixtures of commands written before the chip. Each shows cx exactly when 2.46 did.
+    OLD_LISTS = {
+        None: True,                          # no --mine
+        "session,weekly,resets": True,
+        "label,session,weekly,resets": True,
+        "session": True,
+        "weekly,model": True,
+        "weekly,context,model": True,
+        "session,context": True,
+        "resets": False,
+        "resets,context,model": False,
+        "context": False,
+        "model": False,
+        "context,model": False,
+        "label,context": False,
+    }
+
+    def test_an_older_mine_list_prints_exactly_what_it_printed_before(self):
+        for mine, shows in self.OLD_LISTS.items():
+            with self.subTest(mine=mine):
+                with_cx = self.combined(mine)
+                bare = Rig()
+                try:
+                    # The same Claude snapshot, so a minute rollover can't move the reset time.
+                    shutil.copyfile(self.r.snapshot, bare.snapshot)
+                    args = ["--chain-b64", b64("echo mine"), "--join", "line"] + (["--mine", mine] if mine else [])
+                    p, _ = bare.run(args, session_json())
+                    baseline = p.stdout.decode()
+                finally:
+                    bare.close()
+                if shows:
+                    self.assertIn(self.CX, with_cx)
+                    self.assertEqual(with_cx.replace(" | " + self.CX, "", 1).replace(self.CX + " | ", "", 1)
+                                     .replace(self.CX, "", 1), baseline)
+                else:
+                    self.assertEqual(with_cx, baseline)
+
+    def test_older_lists_keep_cx_where_it_always_sat(self):
+        self.assertEqual(self.combined("weekly,context,model"), "mine\nwk 18%% | %s | ctx 8%% | Opus\n" % self.CX)
+        self.assertEqual(self.combined("session,weekly"), "mine\n5h 42%% | wk 18%% | %s\n" % self.CX)
+        self.assertEqual(self.combined("context,model"), "mine\nctx 8% | Opus\n")
+
+    def test_codex_alone_turns_it_on_with_no_meters(self):
+        self.assertEqual(self.combined("codex"), "mine\n" + self.CX + "\n")
+        self.assertEqual(self.combined("codex,context,model"), "mine\n%s | ctx 8%% | Opus\n" % self.CX)
+
+    def test_codex_beside_the_meters_prints_as_it_always_did(self):
+        self.assertEqual(self.combined("session,weekly,codex"), self.combined("session,weekly"))
+        self.assertEqual(self.combined("label,session,weekly,resets,codex"), self.combined(None))
+
+    def test_nocodex_turns_it_off_beside_the_meters(self):
+        self.assertEqual(self.combined("session,weekly,nocodex"), "mine\n5h 42% | wk 18%\n")
+        self.assertEqual(self.combined("weekly,nocodex,context,model"), "mine\nwk 18% | ctx 8% | Opus\n")
+        self.assertEqual(self.combined("session,weekly,nocodex"), self.without_codex_file("session,weekly"))
+
+    def test_the_new_names_without_a_codex_snapshot_print_what_claude_alone_would(self):
+        self.assertEqual(self.without_codex_file("codex,context,model"), "mine\nctx 8% | Opus\n")
+        self.assertEqual(self.without_codex_file("session,weekly,codex"), "mine\n5h 42% | wk 18%\n")
+        self.assertEqual(self.without_codex_file("session,weekly,nocodex"), "mine\n5h 42% | wk 18%\n")
+
+    def test_a_list_without_session_or_weekly_stays_off_without_a_marker(self):
+        self.assertEqual(self.combined("context,model"), self.combined("nocodex,context,model"))
+
+    def test_the_band_follows_the_same_names(self):
+        self.assertEqual(self.combined(None, "--band"), "mine\n" + self.CX + "\n")
+        self.assertEqual(self.combined("session,nocodex", "--band"), "mine\n")
+        self.assertEqual(self.combined("codex,context", "--band"), "mine\n%s | ctx 8%%\n" % self.CX)
+        self.assertEqual(self.combined("context", "--band"), "mine\nctx 8%\n")
+
+    def test_sanduhrs_line_alone_takes_the_names_too(self):
+        p, _ = self.r.run(["--mine", "session,nocodex"], session_json())
+        self.assertEqual(p.stdout.decode(), "5h 42%\n")
+        p, _ = self.r.run(["--mine", "codex"], session_json())
+        self.assertEqual(p.stdout.decode(), self.CX + "\n")
+        p, _ = self.r.run(["--mine", "session"], session_json())
+        self.assertEqual(p.stdout.decode(), "5h 42%% | %s\n" % self.CX)
+
+    def test_the_chip_takes_a_style_like_the_others(self):
+        k = picks_b64(ours={"codex": {"bold": True}})
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--keep-theirs-b64", k,
+                           "--mine", "session,codex"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\n5h 42%% | \x1b[1m%s\x1b[0m\n" % self.CX)
+        # An older command styled session only: the default look of cx is unchanged.
+        k = picks_b64(ours={"session": {"bold": True}})
+        p, _ = self.r.run(["--chain-b64", b64("echo mine"), "--join", "line", "--keep-theirs-b64", k,
+                           "--mine", "session,weekly"], session_json())
+        self.assertEqual(p.stdout.decode(), "mine\n\x1b[1m5h 42%%\x1b[0m | wk 18%% | %s\n" % self.CX)
+
+    def test_the_grammar(self):
+        good = b64("my.sh")
+
+        def mine(text):
+            return sl.parse_args(["--chain-b64", good, "--join", "line", "--mine", text])
+
+        self.assertEqual(mine("session,codex,context")[4], ("session", "codex", "context"))
+        self.assertEqual(mine("session,nocodex")[4], ("session", "nocodex"))
+        self.assertEqual(mine("codex")[4], ("codex",))
+        for bad in ("codex,nocodex", "nocodex,codex", "codex,resets", "context,codex", "nocodex,weekly",
+                    "codex,codex", "nocodex,nocodex", "noCodex"):
+            with self.subTest(bad=bad):
+                self.assertIsNone(sl.parse_args(["--chain-b64", good, "--join", "line", "--mine", bad]))
+        # Only the chip is a style target; the marker is not a segment.
+        def styled_ok(name):
+            picks = picks_b64(ours={name: {"bold": True}})
+            return sl.parse_args(["--chain-b64", good, "--join", "line", "--keep-theirs-b64", picks]) is not None
+        self.assertTrue(styled_ok("codex"))
+        self.assertFalse(styled_ok("nocodex"))
 
 
 class NoNetworkTests(unittest.TestCase):

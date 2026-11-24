@@ -146,8 +146,8 @@ enum DeskSourceRows {
         return "Codex " + label.prefix(1).lowercased() + label.dropFirst()
     }
 
-    /// One row per Codex window with a number. No pace mark (the pace is Claude's) and no warning (Codex
-    /// alerts never light the Desk, D9); each row is stale on its own.
+    /// One row per Codex window with a number. No pace mark (the pace is Claude's) and no warning (a Codex
+    /// alert pulses its row, `DeskPulses`, but a warning is Claude's); each row is stale on its own.
     static func codexRows(_ input: DeskSourceInput, now: Date) -> [DeskMeterRow] {
         guard input.codexOn, let usage = input.codex.usage else { return [] }
         return windows.compactMap { w in

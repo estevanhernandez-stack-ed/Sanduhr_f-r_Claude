@@ -377,9 +377,12 @@ where nothing drops prints byte for byte as it came, unless `with` is set. `with
 glyph between segments everywhere in the final line: between yours, between Sanduhr's (its usual
 ` | `) and at the same-row seam (its usual ` │ `); a powerline arrow takes the two neighbors'
 backgrounds. `--mine` is a comma list in this order:
-`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `context`
-(`ctx 8%`) and `model` (`Opus`), both from Claude Code's stdin; notices (stale, update) always
-show. Each flag is left out when it holds the default, so a combine without picks writes the same
+`session`, `weekly` (with hot per-model weeklies), `resets` (the default three), `codex`
+(`cx 5h 40% wk 12%`, 2.48), `context` (`ctx 8%`) and `model` (`Opus`), the last two from Claude Code's stdin;
+notices (stale, update) always show. `codex` is the Codex chip: always offered, it shows Codex whatever else is picked, and
+`nocodex` is a marker (it takes no style) that turns it off. A list with neither name keeps 2.46's rule, cx shows when session
+or weekly is in the list, so every older command prints and rewrites the same bytes; the sheet writes the smallest form, and
+the keep-one guard ignores Codex. Each flag is left out when it holds the default, so a combine without picks writes the same
 command as before, and older combined commands read and run unchanged. Swift checks the payloads
 exactly as the script does, so a hand-edited command it would refuse stays the user's.
 
@@ -568,7 +571,7 @@ was. The mod needs no python3. The mod's files ride in the stamped folder (`buil
 without its tests); Claude Code writes its type declarations into `.claude-plugin/types/` of a mod
 folder it loads, and the stamp covers only the shipped files, so that never reads as altered.
 
-**The Claude Code glow hook (item 51; "the notch glow hooks" before Settings v2).** *2.47.0 widened it: three events and one script, see Agent notifications; the entries and the Stop command below are 2.46's, kept for the older generations Update still recognizes.* The fourth kind needs no scripts and no python3: Install adds
+**The Claude Code hook (item 51; "the notch glow hooks" before Settings v2, "the Claude Code glow hook" from then to 2.47).** *2.47.0 widened it: three events and one script, see Agent notifications; the entries and the Stop command below are 2.46's, kept for the older generations Update still recognizes.* The fourth kind needs no scripts and no python3: Install adds
 one matcher group to each of `hooks.Notification` and `hooks.Stop` in the chosen folder's
 `settings.json`, in the shape of Claude Code's settings schema (`{matcher?, hooks: [{type:
 "command", command, async, timeout}]}`):
@@ -895,15 +898,20 @@ a cache keyed by file size and modification time means an unchanged `.jsonl.zst`
 - **Primary and combined bars.** Primary (Claude by default) is the source the menu bar and the combined bars' fill follow;
   a source that is off can't lead. With two sources on, two combined bars (5-hour, weekly) draw `SourceBar`'s two-tone
   layout (the primary's fill, a tick where the other is) with no warning glow, breath or pace tick, then a section per
-  source with a header (name, color, Codex's "as of"); Codex's cards leave out Claude's limit menu, local burn and sparkline.
+  source with a header (name, color, Codex's "as of"); Codex's cards leave out Claude's limit menu and local burn, and draw a
+  sparkline from `history.@codex.json` (2.48: the recorder keeps the recent window in memory and `WidgetSources.build` puts each
+  tier's points on its card; meter history off for `@codex` draws none, and demo mode draws a made-up one).
   A lone Claude section has no header, and one source on draws today's widget exactly. Compact keeps the primary's
   highest card. The menu bar's tooltip appears only when the other source is further out or a Codex primary is stale.
 - **Desk meters.** A meter piece's source is a `src=` field of the layout word (`Combined` writes nothing, so every older
-  word round-trips); only `claude` and `meters` take one. A Codex meter never pulses.
+  word round-trips); only `claude` and `meters` take one. Pulses are keyed by source and limit (2.48, reversing 2.46's "Codex never pulses"):
+  a Codex alert with the Desk in Alerts' delivery pulses the pieces that show Codex, a Codex piece or a Combined row joined with
+  Codex, and never a Claude-only piece; with Desk-only delivery and no such piece it stays a banner (`Notifier.deskCanPulse`).
+  Combined rows now pulse for Claude alerts too. Quiet hours still leave pulses alone, and a Claude-only Mac pulses as before.
 - **Alerts.** Per source, on `codex|tier|resets_at|kind` once-keys; Codex alerts are off by default and arrive as banners.
 - **Files.** `history.@codex.json` (HistoryStore, the reserved `@codex` account; 30 days) and `snapshot.codex.json` beside
   `snapshot.json`, same schema with `source: "codex"` and no `account_ref`. The snapshot goes when Codex is turned off or a
-  reading comes back empty. `sanduhr_statusline.py` appends `cx 5h 40% wk 12%` while it is under 30 minutes old, and
+  reading comes back empty. `sanduhr_statusline.py` appends `cx 5h 40% wk 12%` while it is under 30 minutes old (Combine's Codex chip, below), and
   `sanduhr_mcp.py` (0.6.0-mac) adds a `codex` block to `get_usage` (`status`, `stale`, `as_of`, `age_seconds`, `plan`,
   `tiers`) when it reads; a test checks the MCP and the statusline import no network module.
 - **Demo mode** shows a sample Codex section when Codex is on and never reads `~/.codex`.
@@ -928,7 +936,12 @@ total) so a grown rollout resumes.
   source is switched off): the widget footer's per-agent pieces (`TokenFormat.compact`, the burn between the last two ingests, left
   out when zero, none in demo), `UsageStripChart` stacked by agent with each agent's 30-day total in its accessible name,
   `UsageRankedList` shares ("13.0M (Codex)"), the Sessions agent filter (shown with more than one agent) and label, and
-  `VaultLedgerCsv`'s trailing `agent` column (always appended, Claude-only included). Trends and Skills stay Claude-only.
+  `VaultLedgerCsv`'s trailing `agent` column (always appended, Claude-only included). Skills stays Claude-only. Trends reads the
+  agent roots too (2.48, `UsageTrends.build`, `UsagePageLoader.trends`): agent roots with tokens in the span stack into the weeks
+  in source colors with a legend, the chart's accessible name gives each agent's total, a week reads "no record" only when every
+  contributing source has a gap that week, an idle agent root changes nothing, top projects merge by name with shares, the
+  footer's "History kept since" uses the earliest contributing root, and a Mac with agents and no Claude record still shows
+  Trends. A Claude-only Trends is pinned as 2.47.1 drew it.
 - **Erase.** Erasing an agent's record under Records on this Mac sets `vault.agentStopped.<agent>` and then purges; the agent
   stays stopped until its source is switched on again.
 
@@ -2175,7 +2188,7 @@ terminal previews. state.yaml's `settings_preview` names the card the open page 
 Settings v2 (item 72, `docs/settings-v2-spec.md`) gives each control one name across Settings,
 the menus, the tour, What's New and the setup guide. `Models/SettingsNames.swift` holds the names
 (Menu Bar Shows, Meetings menu in the menu bar, Notch: the island around the camera, Notch glow,
-Claude Code glow hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
+Claude Code hook, Claude meters (line) and (bars), Check for Updates…, Save & Apply, List and
 Text) and the retired ones each replaced. A button or menu item that opens Settings reads
 `SettingsSection.linkTitle`, "<Page> Settings…" with the sidebar title exactly (Desk Settings…,
 Alerts Settings…, Watchers Settings…, Claude Code Settings…, Accounts Settings…), through
@@ -2235,7 +2248,7 @@ without scrolling blind.
   `SettingsWindowController.show(_:anchor:)` opens a page scrolled to one: one `ScrollViewReader`
   around the page scrolls to it twice (just after the page appears and again 0.3 s later, for
   rows a lazy form hadn't built yet). In-page links pass one: Needs the Desk opens Desk at its
-  switch, the Claude Code glow hook hints open Notch at Notch glow, the meters mod lines (Claude
+  switch, the Claude Code hook hints open Notch at Notch glow, the meters mod lines (Claude
   Code's folder boxes, Watchers) open Mods & Config at `meters`, Now Playing's links open Notch at Text and Desk at Where each piece sits.
 - **Links.** `sanduhr://settings/<page>#<anchor>` (and `estedesk://`) open there, `<page>` a raw
   value or an alias; an anchor the page lacks is dropped, and the host alone still opens Settings
@@ -2742,7 +2755,7 @@ refusal. `ResetShutdownTests` covers the gate (each writer a no-op inside
 - Themes from Claude (item 55) → `theme-request.json` (server) and `theme-result.json` (app), mode 0600 in `~/Library/Application Support/Sanduhr/`; a saved theme in `themes/<key>.json`; the opt-in in `UserDefaults` (`themeClaudeDirect`)
 - Desk messages from Claude (item 54) → `desk-messages-request.json` (server), `desk-messages-result.json` and `desk-messages-state.json` (app), all mode 0600 in `~/Library/Application Support/Sanduhr/`; the previous list in `~/Library/Application Support/Desk/messages.txt.previous`; the opt-in in the desk preference `messageClaudeDirect`, the glow in `messageGlow`
 - Watchers (item 66) → `watchers.json` (the two switches, written by the app), `watch-request-*.json` (MCP server) and `watch-stop-*.json` (the Stop hook), mode 0600 in `~/Library/Application Support/Sanduhr/`, each deleted as the app reads it; the switches `watchersAgents` and `watchersBackground` in `com.626labs.sanduhr`; the work mark in the account's `accountData` entry (`"work": "true"`). Watchers themselves are in memory only
-- Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the notch glow hooks in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
+- Claude Code integrations (items 49 to 51) → scripts and the meters mod in `~/Library/Application Support/Sanduhr/integrations/<stamp>/` behind the `current` link; what each install did in `integrations/installs.json` (mode 0600, holds folder paths); the entries themselves in the chosen folder's `.claude.json` / `settings.json` (the Claude Code hook in its `hooks`), with `<file>.sanduhr-backup` beside each. The mod's "already toasted" keys are in Claude Code's own store for the mod. `state.yaml` shows only `integrations: {mcp_installed, statusline_installed, meters_installed, hooks_installed}`
 - Window position → `UserDefaults` (`windowFrame`)
 - Shortcuts (Settings v2) → desk preferences `hotKeySettings` and `hotKeyJoin`, seeded once from 2.10's `hotKeys`, which stays for an older build; Camera and mic's placement → `avPlace`; 2.10's `showClaude` is removed once its choice is in `layout`
 - Now playing (items 53, 53b) → where it shows is the desk preferences `notchLeft`, `notchRight`, `notchStrip` and the `nowPlaying` word in `layout`; the rest is `nowPlayingHidePaused`, `nowPlayingAskApps`, `nowPlayingExcluded` (bundle ids switched off) and `nowPlayingIdle` (When nothing is playing: `automatic` when unset, or a notch content's raw value). Item 53's `nowPlaying` and `nowPlayingDesk` are read once by the upgrade (`nowPlayingPlacementUpgraded`); what plays stays in memory

@@ -75,7 +75,7 @@ private struct WatcherSwitchesSection: View {
             Toggle("Show Claude Code's background work", isOn: $background)
             if hooked == false {
                 HStack {
-                    Text("Needs the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder.")
+                    Text("Needs the \(SettingsNames.claudeCodeHook) in a Claude Code folder.")
                         .font(.caption).foregroundStyle(.orange)
                     Spacer()
                     SettingsLinkButton(.integrations, anchor: SettingsAnchor.folders)

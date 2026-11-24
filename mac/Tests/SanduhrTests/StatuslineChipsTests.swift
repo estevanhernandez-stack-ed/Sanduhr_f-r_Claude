@@ -189,21 +189,23 @@ struct StatuslineChipsTests {
         var c = StatuslineChips(Self.inspection)
         func chip(_ s: SanduhrSegment) -> StatuslineChips.Chip { c.mineChips.first { $0.key == s.rawValue }! }
         // The label's chip reads "Account" until the script names one (a folder linked to an account).
-        #expect(c.mineChips.map(\.label) == ["Account", "5h 42%", "wk 18%", "wk resets Thu 3p", "ctx 8%", "Opus"])
-        #expect(c.mineChips.map(\.kept) == [true, true, true, true, false, false])
+        // Codex's chip reads by name until the script has a Codex snapshot to quote; it is on, as cx always was.
+        #expect(c.mineChips.map(\.label) == ["Account", "5h 42%", "wk 18%", "wk resets Thu 3p", "Codex", "ctx 8%", "Opus"])
+        #expect(c.mineChips.map(\.kept) == [true, true, true, true, true, false, false])
         #expect(c.mineChips.allSatisfy { $0.source == .sanduhr })
         c.toggle(chip(.model))
         c.toggle(chip(.weekly))
         c.toggle(chip(.resets))
         #expect(c.selection.mine == [.label, .session, .model])
+        // Codex no longer rides with the meters in a list the sheet writes: with both gone it stays until its own chip goes.
         c.toggle(chip(.session))
-        #expect(c.selection.mine == [.label, .model])
-        // The last one besides the label stays; the label itself can still go.
+        #expect(c.selection.mine == [.label, .codex, .model])
+        // The last one besides the label and Codex stays; the label itself can still go.
         #expect(!chip(.model).enabled && chip(.label).enabled)
         c.toggle(chip(.model))
-        #expect(c.selection.mine == [.label, .model])
+        #expect(c.selection.mine == [.label, .codex, .model])
         c.toggle(chip(.label))
-        #expect(c.selection.mine == [.model])
+        #expect(c.selection.mine == [.codex, .model])
         // Back to the defaults: no --mine.
         for s in [SanduhrSegment.label, .session, .weekly, .resets] { c.toggle(chip(s)) }
         c.toggle(chip(.model))

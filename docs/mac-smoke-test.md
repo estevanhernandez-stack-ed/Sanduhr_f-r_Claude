@@ -703,15 +703,22 @@ S=~/Library/Application\ Support/Sanduhr/integrations
 - [ ] `state.yaml` shows `meters_installed` with the count and no path. Clean up: Remove, then
   `rm -rf /tmp/other-mod /tmp/st-meters.json /tmp/snap.json`.
 
-## 22. The notch glows when Claude Code needs you (item 51)
+## 22. The Claude Code hook and the notch glow (item 51, 2.47.0)
 
-The installed hooks post a Darwin notification (`/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` or `.done`): every running Sanduhr hears it, a dev build too, and nothing is ever launched. A `sanduhr://` link, which the steps below also use, goes to the default app for the scheme and can launch the installed copy: aim link tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`.
+The Claude Code hook (called the Claude Code glow hook before 2.48.0) adds one entry to each of three events, `UserPromptSubmit`, `Notification` and `Stop`, in a folder's `settings.json`.
+Each entry runs the same command shape, which differs only in the event word (`prompt`, `waiting` or `done`):
 
-*2.47.0 widened these labels and the hook: the switches below are Settings, Notch, Glow's "When an agent is waiting on you", "When an agent
-finishes" and "Not while the agent's app is in front" (the same switches as Settings, Notifications). The hook now has a third event, `UserPromptSubmit`,
-and writes a signal file before posting; where a step here counts entries or quotes the old command, the updated hook has three lists and its
-command runs `osascript`, and a bare post (the `notifyutil` and `sanduhr://` commands below, sent by hand) still glows exactly as before. Section 81
-covers the notification, the card and the signal files.*
+```
+d="$HOME/Library/Application Support/Sanduhr"; /usr/bin/pgrep -xq Sanduhr && /usr/bin/osascript -l JavaScript -e '<signalScript>' "$d" <event> >/dev/null 2>&1; /usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.<event> || true
+```
+
+While a Sanduhr runs, `signalScript` reads the hook's input once and drops a small `cc-signal-*.json` file into Sanduhr's folder (the folder and the session id only; on `Stop`, with Watchers' "Show Claude Code's background work" on, also a `watch-stop-*.json`). Then
+`notifyutil` posts the Darwin notification, which every running Sanduhr hears, a dev build too. A post never launches anything, so with no Sanduhr running the command does nothing and exits 0.
+Each entry is `"async": true` with `"timeout": 5`, and only the `Notification` entry has a matcher, `permission_prompt|idle_prompt|elicitation_dialog`. A `sanduhr://` link, which the first steps below also use, goes to the
+default app for the scheme and can launch the installed copy: aim link tests at the dev build with `open -g -a <dev Sanduhr.app> 'sanduhr://claude-code?event=waiting'`.
+
+The switches below are Settings, Notch, Notch glow's "When an agent is waiting on you", "When an agent finishes" and "Not while the agent's app is in front" (the same switches as Settings, Notifications).
+A bare post (the `notifyutil` and `sanduhr://` commands below, sent by hand, with no signal file) still glows exactly as it did before 2.47.0. Section 81 covers the notification, the Desk card and the signal files.
 
 Use a test folder, never your real `~/.claude*`. The `say` hook stands for a hook of your own:
 
@@ -733,30 +740,32 @@ cp ~/.claude-smoketest/settings.json /tmp/st-hooks.json
   glow, no window, no error.
 - [ ] "Not while the agent's app is in front" on: run the waiting command in Terminal (Terminal stays
   in front): no glow. Switch it off: it glows from Terminal too. Put it back on.
-- [ ] Settings, Claude Code: `~/.claude-smoketest` has a fourth row, Notch glow when Claude needs
-  you, Not installed, and Install… works even where the page says Python is missing. Under the
-  folders, a line says the glow is off until turned on in Notch, Notch glow, and Notch Settings… opens
+- [ ] Settings, Claude Code: `~/.claude-smoketest` has a fourth row, **Claude Code hook**, Not installed, and Install… works even where the page says Python is missing. Settings search for `glow`,
+  `hook` and `Claude Code hook` each reaches the row. Under the folders, a line says the Claude Code hook only tells Sanduhr and the glow is off until turned on in Notch, Notch glow, and Notch Settings… opens
   the Notch page.
-- [ ] Install…: the sheet says Claude Code tells Sanduhr only that it is waiting or finished,
-  nothing about the conversation, and that Sanduhr adds one entry to each of
-  `hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`; Notch Settings…
-  there opens the Notch page. Install: Installed;
-  `jq '.hooks.Stop | length, .[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints 2
-  and `"say done"`, and `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
-  matcher `permission_prompt|idle_prompt|elicitation_dialog` and the
-  `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true` command with
-  `"async": true`. `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` from a script
-  glows like the link.
-- [ ] Outdated: put an earlier version's command back,
+- [ ] Install…: the sheet is headed "Let Claude Code tell Sanduhr when it finishes or needs you?" and says Claude Code sessions in the folder tell Sanduhr when you send a prompt, when they wait on you and when a turn
+  finishes, so Sanduhr can time the turn, notify you and glow the notch; that the hook reads what Claude Code hands it, which includes your prompt, and keeps only the session's folder and its session id; and that
+  Sanduhr adds one entry to each of `hooks.UserPromptSubmit, hooks.Notification and hooks.Stop` in `~/.claude-smoketest/settings.json`, and Remove takes out only those three entries. Notch Settings…
+  there opens the Notch page. Install: Installed, and `jq '.hooks | keys' ~/.claude-smoketest/settings.json` lists `Notification`, `Stop` and `UserPromptSubmit`.
+  `jq '.hooks.UserPromptSubmit | length' ~/.claude-smoketest/settings.json` prints 1, `.hooks.Notification | length` prints 1, and `.hooks.Stop | length` prints 2 (yours and Sanduhr's);
+  `jq '.hooks.Stop[0].hooks[0].command' ~/.claude-smoketest/settings.json` prints `"say done"`, still first. `jq '.hooks.Notification[0]' ~/.claude-smoketest/settings.json` shows the
+  matcher `permission_prompt|idle_prompt|elicitation_dialog` and a command of the shape above ending `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true`, with `"async": true` and
+  `"timeout": 5`; the `UserPromptSubmit` and `Stop` entries have no matcher and end `….prompt || true` and `….done || true`. `grep -c osascript ~/.claude-smoketest/settings.json` prints 3.
+  `/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting` from a script glows like the link.
+- [ ] Outdated, an earlier generation. Each of these is still recognized as Sanduhr's: the row reads **Outdated** (on the Claude Code page and on Settings, Notifications, where "The Claude Code hook here
+  is an older one…" shows), and Install rewrites the entry in place, leaving your `say done` where it was. Item 51's command, which opened the link:
   `jq '.hooks.Notification[0].hooks[0].command = "/usr/bin/pgrep -xq Sanduhr && /usr/bin/open -g '"'"'sanduhr://claude-code?event=waiting'"'"' || true"' ~/.claude-smoketest/settings.json > /tmp/st-old.json && mv /tmp/st-old.json ~/.claude-smoketest/settings.json`:
-  the row reads Outdated. Install: Installed, and
-  `grep -c 'sanduhr://' ~/.claude-smoketest/settings.json` prints 0.
+  Outdated. Install: Installed, and `grep -c 'sanduhr://' ~/.claude-smoketest/settings.json` prints 0. Then 2.46's bare post, which had only the two entries:
+  `jq '.hooks.Notification[0].hooks[0].command = "/usr/bin/notifyutil -p com.626labs.sanduhr.claude-code.waiting || true" | del(.hooks.UserPromptSubmit)' ~/.claude-smoketest/settings.json > /tmp/st-old.json && mv /tmp/st-old.json ~/.claude-smoketest/settings.json`:
+  Outdated again (one list is missing and one is old). Install: Installed, `.hooks.UserPromptSubmit | length` prints 1 and `grep -c osascript` prints 3. Remove still takes an older generation out too: repeat the
+  first command, Remove, and `grep -c 'sanduhr://' ~/.claude-smoketest/settings.json` prints 0 with `say done` intact; Install again for the steps below.
 - [ ] With Claude Code: both switches on, "Not while the agent's app is in front" on.
   `CLAUDE_CONFIG_DIR=~/.claude-smoketest claude` in a scratch folder, ask for something that needs
   a permission (`create a file x.txt`), and switch to Finder before it asks: the notch glows
   within a second of the prompt. Answer it; when the turn finishes with Finder in front, a
   second glow (unless within 5 seconds of the first). With the terminal in front: no glow, and
-  you hear "done" from your own hook every turn. Claude Code never waits on the hooks and shows
+  you hear "done" from your own hook every turn. Sending the prompt itself fires `UserPromptSubmit`, which glows nothing (it only starts the turn's timer: section 81 step 15 walks the
+  notification and the Desk card for a real turn). Claude Code never waits on the hooks and shows
   no hook error.
 - [ ] Quit Sanduhr; finish a Claude Code turn: Sanduhr does not start (`pgrep -x Sanduhr` finds
   nothing), and no `watch-stop-*` file appears in `~/Library/Application Support/Sanduhr`. With a
@@ -1232,7 +1241,7 @@ Watchers; in Settings, Desk, Layout put Watchers in the top right corner.
    Dismiss All. Watchers Settings… opens Settings, Watchers.
 6. Lost touch: start one and wait 10 minutes without an update: it greys and reads "lost touch";
    an update brings it back.
-7. Background work: Settings, Claude Code shows the notch glow hooks as **Outdated** for a folder
+7. Background work: Settings, Claude Code shows the Claude Code hook as **Outdated** for a folder
    installed before this version; Install updates it (`jq -r '.hooks.Stop[0].hooks[0].command'
    ~/.claude-smoketest/settings.json` names `watchers.json`, `osascript` and
    `notifyutil -p com.626labs.sanduhr.claude-code.done`, and no `sanduhr://`). Turn **Show Claude
@@ -1759,7 +1768,7 @@ desktop well away from every piece.
    its page through `settings-link`, the retired names are missing from the pages that
    had them, and `menu_submenus` ends with `Menu Bar Shows`.
 2. Every Settings… button, by hand (page names as of slice 2): Claude Code's **Notch Settings…**
-   (beside the Claude Code glow hook line); Watchers' **Claude Code Settings…**; General's **Desk
+   (beside the Claude Code hook line); Watchers' **Claude Code Settings…**; General's **Desk
    Settings…**, **Notch Settings…** and **Widget Settings…**; Now Playing's **Notch Settings…** and
    **Desk Settings…**; Notch, Notch glow's **Claude Code Settings…**; Usage's **Accounts Settings…**
    (Overview with activity Not tracked); a Desk meter row's or widget card's **Alerts Settings…**; a
@@ -1775,7 +1784,7 @@ desktop well away from every piece.
    widget's menu: the hourglass rotates and Settings, General, Menu bar, **Menu Bar Shows** reads Rotate.
 5. Names: Settings, General reads **Menu Bar Shows**, **Meetings menu in the menu bar** and **Notch: the
    island around the camera**; Notch has the same notch switch name and one **Notch glow** section with
-   all six switches and Test Glow; Integrations' fourth row is **Claude Code glow hook**; Layout lists
+   all six switches and Test Glow; Integrations' fourth row is **Claude Code hook**; Layout lists
    **Claude meters (line)** and **Claude meters (bars)**; Updates has **Check for Updates…**; a theme
    suggestion's card has **Save & Apply**; Message has a **List | Text** switch, and its Text view's
    reference reads "Mon: text: a line for Mondays (Mon to Sun): it replaces the every-day lines, or with
@@ -1815,7 +1824,7 @@ desktop well away from every piece.
    Under the camera. Set it to In the right wing and run `smoke/smoke do av-test "mic on"`: the right wing
    shows the mic; `smoke/smoke do av-test "mic off"`: the right wing shows its own text again.
 6. Watchers: the two switches (with a **Claude Code Settings…** hint while no folder has the Claude
-   Code glow hook), **On the notch** and **On the Desk** (set On the notch to Right wing: Notch's Right
+   Code hook), **On the notch** and **On the Desk** (set On the notch to Right wing: Notch's Right
    wing reads Watchers; set On the Desk to Middle left: Desk's Watchers row reads it), the glow
    rule and its Now line (Desk off, or nothing placed, says so), Above the prompt with each folder's
    meters mod and **Mods & Config Settings…** (opens Mods & Config at the mod). With On the notch set and the Desk on, `smoke/smoke do watch-test start` then `smoke/smoke do watch-test wait`: the
@@ -1891,7 +1900,7 @@ the default 680 pt window shows full previews, `settings_preview_folded: false`)
    after `settings watchers above-prompt` (Watchers and Notch both have a `glow`).
 2. Search: type **glow** in the field over the sidebar. The sidebar shows Notch with **Notch glow**
    under it, Watchers with **Glow when a watcher waits on you**, Claude Code with **Turning the glow
-   on** and **Claude Code glow hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
+   on** and **Claude Code hook**, then Desk Look (Colors, a synonym match). Press Return: Notch opens scrolled to Notch glow,
    lit for about a second and a half. Type **percent**: General, **Menu Bar Shows**. Type
    **margins**, click **Margins**: Desk opens with **Advanced** open and Margins on screen. Escape
    clears the field and the sidebar shows every page again.
@@ -1994,7 +2003,7 @@ keys of your own) and a made-up account.
    `smoke/smoke do reset now` is refused with an error.
 2. On the scratch user: copy `~/.claude-scratch/settings.json` and `~/.claude-scratch/.claude.json`
    aside. Install the MCP server, the statusline (Combine with a line of your own), Meters above
-   the prompt (switched off once on Mods & Config) and the Claude Code glow hook into the scratch
+   the prompt (switched off once on Mods & Config) and the Claude Code hook into the scratch
    folder. Search Settings for "start over": it opens About at **Reset Sanduhr…**.
 3. **Reset Sanduhr…**: every part is checked; the scratch folder is listed (`~/.claude-scratch`)
    with its four entries. Uncheck the folder: an orange warning says its entries stay. Check it
@@ -2893,7 +2902,7 @@ process; it never writes.
    missing" and "Click Update to point it at this version's server." Update turns the row Installed and Check green.
 4. Delete the `sanduhr` entry by hand and click Check without reopening the page: "The MCP server isn't registered for ~/cc-scratch any
    more, so there was nothing to check." and the row reloads to Not installed.
-5. Not, Another entry and invalid JSON rows have no Check; the statusline and glow hook rows never do.
+5. Not, Another entry and invalid JSON rows have no Check; the statusline and Claude Code hook rows never do.
 6. Apple's stub with no developer tools behind it is not walked (that means removing the Command Line Tools). The unit tests cover it:
    the probe says "the Python 3 it runs is missing" without starting it, and the row reads Outdated.
 
@@ -3182,7 +3191,7 @@ if it is not there. Never use or edit a real `~/.claude*` folder. Launch with
    Claude Code hook. Install it on the Claude Code page." `smoke/smoke state` has `agent_watch: []` and `turn_cards: []`; the Desk, the widget and the glow are exactly as
    2.45.0 (the Desk pulse and **Test Glow** still glow the notch in the notch ink). Settings search for `agent` or `turn` reaches Notifications.
 2. **Turn the sources and the hook on.** In Sources tick Codex and the Antigravity CLI (`sources.codex.on` and `sources.antigravity.on` read true in `state.yaml`). In Settings,
-   Claude Code, install the Claude Code glow hook into `~/.claude-smoketest`. The consent sheet says the hook reads the prompt and keeps only the folder and the session.
+   Claude Code, install the Claude Code hook into `~/.claude-smoketest`. The consent sheet says the hook reads the prompt and keeps only the folder and the session.
    `jq '.hooks | keys' ~/.claude-smoketest/settings.json` lists `Notification`, `Stop` and `UserPromptSubmit`. The Notifications page now shows that folder "Installed" under
    Claude Code and "On" for Codex and Antigravity, and `agent_watch` lists `codex home` and `antigravity cli` with `mode: fsevents`, and `signals` for Claude Code. In
    Settings, Notifications switch **Not while the agent's app is in front** off for steps 3 to 6 and 8 to 14 (the terminal you run the smoke from counts as in front, which holds
@@ -3254,6 +3263,6 @@ if it is not there. Never use or edit a real `~/.claude*` folder. Launch with
     never `ps %cpu`. Repeat after `agy_turn 5` has armed and its 90-second wait has run out (the 5-second ticker stops once it fires).
 
 Afterwards: quit the dev build; clear Sanduhr's notifications in Notification Center; `rm -r ~/sanduhr-smoke/codex-notify ~/sanduhr-smoke/scratch-project; rm -f ~/sanduhr-smoke/stdin-*.json`; remove
-`~/.gemini/antigravity-cli` only if you made it; take the throwaway hooks out of `~/.claude-smoketest/settings.json` (or Remove the glow hook there); restore
+`~/.gemini/antigravity-cli` only if you made it; take the throwaway hooks out of `~/.claude-smoketest/settings.json` (or Remove the Claude Code hook there); restore
 `~/Library/Application Support/Sanduhr` from the backup (`rm -r` it, then copy `support-backup` back) and the preferences per section 45 (this puts back the glow switches step 17 wrote); relaunch
 `/Applications/Sanduhr.app`.

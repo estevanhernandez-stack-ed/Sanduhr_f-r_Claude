@@ -33,5 +33,5 @@ struct CodexAlertsToggle: View {
     }
 
     static let title = "Codex alerts"
-    static let hint = "Codex 5-hour and weekly limits alert with the lines and options above. Only a current reading alerts, never an old log."
+    static let hint = "Codex 5-hour and weekly limits alert with the lines and options above. Only a current reading alerts, never an old log. With a Desk pulse chosen, they pulse a Desk meter that shows Codex; with none, they show as banners."
 }

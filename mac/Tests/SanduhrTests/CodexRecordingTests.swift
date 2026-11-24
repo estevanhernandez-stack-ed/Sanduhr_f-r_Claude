@@ -186,6 +186,41 @@ struct CodexRecorderTests {
         #expect(exists(snapshotURL))
     }
 
+    // MARK: Sparklines
+
+    @Test func theRecorderHandsTheWidgetItsSparklinePoints() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var seen: [HistoryStore.History] = []
+        let rec = make()
+        rec.onSparklines = { seen.append($0) }
+        rec.record(publication(five: 40, week: 12))
+        rec.record(publication(five: 45, week: 12, at: asOf.addingTimeInterval(120)))
+        #expect(seen.last?[Tier.fiveHour.rawValue]?.map(\.v) == [40, 45])
+        #expect(seen.last?[Tier.sevenDay.rawValue]?.map(\.v) == [12])
+    }
+
+    @Test func aRestartSeedsTheSparklinesFromTheFile() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        make().record(publication(five: 40, week: 12))
+        drain()
+        var seen: [HistoryStore.History] = []
+        let again = make()
+        again.onSparklines = { seen.append($0) }
+        // The same event replays: nothing new is recorded, but the widget still gets what is on file.
+        again.record(publication(five: 40, week: 12))
+        #expect(seen.last?[Tier.fiveHour.rawValue]?.map(\.v) == [40])
+    }
+
+    @Test func meterHistoryOffForCodexHandsTheWidgetNothing() throws {
+        defer { try? FileManager.default.removeItem(at: dir) }
+        MeterHistory.set(false, for: CodexRecorder.historyAccount, in: defaults)
+        var calls = 0
+        let rec = make()
+        rec.onSparklines = { _ in calls += 1 }
+        rec.record(publication())
+        #expect(calls == 0)
+    }
+
     // MARK: Snapshot
 
     @Test func theSnapshotIsWrittenStampedWithTheEventsTime() throws {
@@ -388,13 +423,16 @@ struct SourceAlertRulesTests {
         #expect(pace.alerts.map(\.title).first?.hasPrefix("Codex 5-hour on pace to run out at ") == true)
     }
 
-    /// A Codex alert never pulses Claude's Desk meters: with Desk running it is still a banner.
-    @Test func aCodexAlertIsAlwaysABannerNeverAClaudePulse() {
+    /// A Codex alert pulses the Desk where a piece shows Codex (`desk` is the caller's "there is one", 2.48.0;
+    /// DeskCodexRouteTests has the rest) and is a banner where none does. Claude's route is the same either way.
+    @Test func aCodexAlertPulsesOnlyWhereTheDeskCanShowIt() {
         var u = UsageResponse()
         u.tiers[.fiveHour] = TierUsage(utilization: 95, resetsAt: "2026-11-09T15:00:00Z")
         let s = settings { $0.codexAlerts = true; $0.delivery = .desk }
         let codex = run(u, s, source: .codex, fresh: [.fiveHour], desk: true)
-        #expect(codex.banner && !codex.pulse)
+        #expect(!codex.banner && codex.pulse)
+        let none = run(u, s, source: .codex, fresh: [.fiveHour], desk: false)
+        #expect(none.banner && !none.pulse)
         let claude = run(u, s, desk: true)
         #expect(!claude.banner && claude.pulse)
     }

@@ -4,7 +4,7 @@ import Foundation
 /// it, and the run itself.
 ///
 /// **The order is the point.** Claude Code folders come first: Sanduhr's entries there (the MCP
-/// server, the statusline, the meters mod and its switch, the glow hooks) are undone through the
+/// server, the statusline, the meters mod and its switch, the Claude Code hook) are undone through the
 /// receipts in `integrations/installs.json`, and those receipts live in the Application Support
 /// folder a later step deletes (F20). Then the accounts, each through Remove Account, so the
 /// Keychain items go with the store's own rules (a dev build clears only its file, never the

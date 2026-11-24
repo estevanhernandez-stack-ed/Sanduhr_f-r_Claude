@@ -1355,7 +1355,7 @@ private struct NotchGlowSection: View {
         Toggle("Not while the agent's app is in front", isOn: $skipTerminal)
             .disabled(!claudeWaiting && !claudeDone)
         HStack(alignment: .firstTextBaseline) {
-            Text("The two agent rows are the same switches as on Notifications. Waiting needs the \(SettingsNames.claudeCodeGlowHook) in a Claude Code folder, installed in Claude Code. An agent tells Sanduhr only that it waits or finished, nothing about the conversation.")
+            Text("The two agent rows are the same switches as on Notifications. Waiting needs the \(SettingsNames.claudeCodeHook) in a Claude Code folder, installed in Claude Code. An agent tells Sanduhr only that it waits or finished, nothing about the conversation.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)

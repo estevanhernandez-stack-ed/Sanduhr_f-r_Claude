@@ -298,7 +298,7 @@ enum SettingsAnchor {
                       synonyms: ["Add Folder", "MCP server", "statusline", "prompt", "hooks", "install", "account",
                                  "Meters here show", "per-seat meters", "seat"]),
         SettingsEntry(title: "Turning the glow on", page: .integrations, anchor: glowHint,
-                      synonyms: ["Notch Settings…", "glow hook"]),
+                      synonyms: ["Notch Settings…", "Claude Code hook"]),
         SettingsEntry(title: SettingsNames.metersAbovePrompt, page: .mods, anchor: metersMod,
                       synonyms: [IntegrationScripts.modName, "Sanduhr's own mod", "mod", "band", "bars", "animated",
                                  "Update", "Remove", "enabledPlugins"]),
@@ -353,7 +353,7 @@ extension SettingsNames {
         checkAppMenus: SettingsAnchor.shortcuts,
         deskSwitch: SettingsAnchor.desk, oledCareSwitch: SettingsAnchor.oled, notchSwitch: SettingsAnchor.notch, notchGlow: SettingsAnchor.glow,
         cameraMicPlace: SettingsAnchor.cameraMic,
-        claudeCodeGlowHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
+        claudeCodeHook: SettingsAnchor.folders, metersAbovePrompt: SettingsAnchor.metersMod,
         byFolder: SettingsAnchor.inventory,
         weatherLookUp: SettingsAnchor.weatherPlace, weatherShowAs: SettingsAnchor.weatherPlace,
         claudeMetersLine: SettingsAnchor.pieces, claudeMetersBars: SettingsAnchor.pieces,
@@ -382,6 +382,12 @@ enum SettingsSearch {
         .updates: ["update", "Sparkle"],
     ]
 
+    /// Words a table name goes by besides itself: the hook was the "glow hook" until 2.48.0, and
+    /// people still look for it by "glow".
+    static let nameSynonyms: [String: [String]] = [
+        SettingsNames.claudeCodeHook: ["glow hook", "glow", "hook", "hooks", "notification"],
+    ]
+
     /// The whole index: every page, every anchor and every name in `SettingsNames.table`.
     static let index: [SettingsEntry] = {
         var out = SettingsSection.groups.flatMap(\.sections).map {
@@ -392,6 +398,7 @@ enum SettingsSearch {
             let anchor = SettingsNames.anchors[name]
             if !out.contains(where: { $0.title == name && $0.page == page && $0.anchor == anchor }) {
                 out.append(SettingsEntry(title: name, page: page, anchor: anchor,
+                                         synonyms: nameSynonyms[name] ?? [],
                                          advanced: SettingsAnchor.isAdvanced(anchor, on: page)))
             }
         }

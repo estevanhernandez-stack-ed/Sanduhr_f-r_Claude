@@ -71,7 +71,16 @@ enum DemoMode {
     /// A made-up meter history for a sample account: a reading every 3 hours over 30 days, each
     /// limit rising through its window and dropping at the reset, ending at the sample numbers.
     static func history(for account: String, now: Date = Date()) -> HistoryStore.History {
-        let latest = usage(for: account, now: now)
+        rampHistory(latest: usage(for: account, now: now), wiggle: account == accounts[0] ? 6 : 2, now: now)
+    }
+
+    /// A made-up Codex history for the widget's Codex sparklines: the same shape as a sample account's,
+    /// ending at `codexUsage`. Never written anywhere.
+    static func codexHistory(now: Date = Date()) -> HistoryStore.History {
+        HistoryStore.sparklines(rampHistory(latest: codexUsage(now: now), wiggle: 4, now: now))
+    }
+
+    private static func rampHistory(latest: UsageResponse, wiggle amplitude: Double, now: Date) -> HistoryStore.History {
         let step: TimeInterval = 3 * 3600
         let count = Int(TimeInterval(MeterHistory.days) * 86_400 / step)
         var out: HistoryStore.History = [:]
@@ -83,7 +92,7 @@ enum DemoMode {
                 // How far through its window the limit was at that reading, 0 to 1, ending at `end`.
                 let phase = (age / period).truncatingRemainder(dividingBy: 1)
                 // A small wiggle, nothing at the latest reading.
-                let wiggle = (account == accounts[0] ? 6 : 2) * sin(age / step / 3)
+                let wiggle = amplitude * sin(age / step / 3)
                 let value = min(100, max(0, end * (1 - phase) + wiggle))
                 return HistoryStore.Point(t: ISO8601.stamp(now.addingTimeInterval(-age), fractional: false), v: (value * 10).rounded() / 10)
             }

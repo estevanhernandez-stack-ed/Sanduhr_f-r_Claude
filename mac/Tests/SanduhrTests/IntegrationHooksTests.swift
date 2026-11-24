@@ -5,7 +5,7 @@ import Testing
 /// The Claude Code hook's install (item 51, 2.47): Sanduhr's entries join `hooks.UserPromptSubmit`,
 /// `hooks.Notification` and `hooks.Stop` in a folder's settings.json, and Remove takes out exactly
 /// those. On made-up homes only.
-@Suite("Integration installer, notch glow hooks")
+@Suite("Integration installer, Claude Code hook")
 struct IntegrationHooksTests {
     /// 2.47: each event runs the signal script while a Sanduhr runs (it writes the folder and
     /// session to a file, and on done item 66's report), then posts its Darwin notification.
@@ -494,7 +494,7 @@ struct IntegrationHooksTests {
     @Test func theKindNeedsNoPythonAndNoScripts() {
         #expect(!IntegrationKind.hooks.needsPython)
         #expect(!IntegrationKind.hooks.needsScripts)
-        #expect(IntegrationKind.hooks.title == "Claude Code glow hook")
+        #expect(IntegrationKind.hooks.title == "Claude Code hook")
         #expect(IntegrationKind.hooks.keyPath == "hooks.UserPromptSubmit, hooks.Notification and hooks.Stop")
     }
 
@@ -515,6 +515,12 @@ struct IntegrationHooksTests {
 
     /// The Install question says exactly what the hook reads and keeps (2.47): Claude Code's input,
     /// of which only the folder and the session id are kept, in a file Sanduhr deletes as it reads it.
+    /// The Install question's headline names all three things the hook does, not just the glow (2.48).
+    @Test func theConsentHeadlineMatchesTheThreeEventHook() {
+        #expect(HooksConsentCopy.headline == "Let Claude Code tell Sanduhr when it finishes or needs you?")
+        #expect(!HooksConsentCopy.headline.lowercased().contains("glow"))
+    }
+
     @Test func theConsentCopySaysWhatTheHookReadsAndKeeps() {
         #expect(HooksConsentCopy.lead("~/.claude") == "Claude Code sessions using ~/.claude tell Sanduhr when you send a prompt, when they wait on you (a permission prompt or a question) and when a turn finishes, so Sanduhr can time the turn, notify you and glow the notch.")
         #expect(HooksConsentCopy.keeps == "The hook reads what Claude Code hands it, which includes your prompt, and keeps only the session's folder and its session id. It writes those two to a small file in Sanduhr's folder, which Sanduhr deletes as it reads it, and nothing else. Nothing leaves this Mac, and while Sanduhr isn't running the hook writes nothing.")

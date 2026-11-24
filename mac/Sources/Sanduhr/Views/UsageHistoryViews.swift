@@ -13,7 +13,7 @@ struct UsageTrendsTab: View {
     let accent: Color
 
     var body: some View {
-        if UsageSource.of(vm.dataChoices(for: label)).recordID == nil {
+        if UsageSource.of(vm.dataChoices(for: label)).recordID == nil, page.trends == nil, page.trendsEmpty {
             UsageNeedsRecord(what: "Trends", label: label, navigation: navigation)
         } else {
             ScrollView {
@@ -49,7 +49,8 @@ private struct UsageTrendsBody: View {
             if trends.bars.isEmpty {
                 Text("No record yet.").font(.caption).foregroundStyle(.secondary)
             } else {
-                UsageWeeksChart(bars: trends.bars, accent: accent)
+                UsageWeeksChart(bars: trends.bars, accent: accent, stack: AgentStripStack(trends: trends),
+                                name: trends.chartName)
                     .frame(height: 150)
                 HStack {
                     Text(trends.bars.first.map { UsageDates.short($0.weekStart) } ?? "")
@@ -60,6 +61,7 @@ private struct UsageTrendsBody: View {
                 .foregroundStyle(.secondary)
                 UsageLegend(noRecord: trends.bars.contains { $0.kind == .noRecord || $0.partialGap },
                             current: trends.bars.contains(where: \.isCurrent))
+                if trends.stacked { UsageAgentLegend(stack: AgentStripStack(trends: trends)) }
             }
             UsageRankedList(title: "Top projects", items: trends.top)
             if hidden || UsageProjectNames.anyHidden(trends.top.map(\.name)) {
@@ -78,6 +80,9 @@ private struct UsageTrendsBody: View {
 struct UsageWeeksChart: View {
     let bars: [UsageTrends.Bar]
     let accent: Color
+    /// Agent colors when some agent other than Claude Code is in the span; nil draws the accent.
+    var stack: AgentStripStack?
+    var name = "Claude Code tokens by week"
 
     static let gap: CGFloat = 4
     static let edge: CGFloat = 8
@@ -86,7 +91,7 @@ struct UsageWeeksChart: View {
         Canvas { ctx, size in draw(ctx, size) }
             .overlay { tips }
             .accessibilityElement()
-            .accessibilityLabel("Claude Code tokens by week")
+            .accessibilityLabel(name)
             .accessibilityValue(bars.map(spoken).joined(separator: ", "))
     }
 
@@ -95,7 +100,7 @@ struct UsageWeeksChart: View {
         switch b.kind {
         case .noRecord: return "\(when): no record"
         case .zero: return "\(when): none"
-        case .bar: return "\(when): \(TokenFormat.compact(b.total))\(b.isCurrent ? ", in progress" : "")"
+        case .bar: return "\(when): \(b.valueText)\(b.isCurrent ? ", in progress" : "")"
         }
     }
 
@@ -114,16 +119,37 @@ struct UsageWeeksChart: View {
                 ctx.fill(Path(CGRect(x: x, y: base - 1, width: width, height: 1)), with: .color(.secondary.opacity(0.4)))
             case .bar:
                 let h = max(3, CGFloat(b.total) / peak * (base - 4))
-                let rect = CGRect(x: x, y: base - h, width: width, height: h)
-                if b.isCurrent {
-                    UsageTexture.hatch(ctx, rect, color: accent)
-                } else {
-                    ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(accent))
-                }
+                drawBar(ctx, b, CGRect(x: x, y: base - h, width: width, height: h))
                 if b.partialGap {
                     UsageTexture.dots(ctx, CGRect(x: x, y: base + 2, width: width, height: Self.edge - 2), color: .secondary)
                 }
             }
+        }
+    }
+
+    /// One bar: the accent (hatched for the week in progress), or the week's segments stacked
+    /// bottom up in the source colors.
+    private func drawBar(_ ctx: GraphicsContext, _ b: UsageTrends.Bar, _ rect: CGRect) {
+        guard let stack, b.total > 0 else {
+            if b.isCurrent {
+                UsageTexture.hatch(ctx, rect, color: accent)
+            } else {
+                ctx.fill(Path(roundedRect: rect, cornerRadius: 2), with: .color(accent))
+            }
+            return
+        }
+        var clipped = ctx
+        clipped.clip(to: Path(roundedRect: rect, cornerRadius: 2))
+        var y = rect.maxY
+        for seg in b.segments {
+            let h = rect.height * CGFloat(seg.tokens) / CGFloat(b.total)
+            let part = CGRect(x: rect.minX, y: y - h, width: rect.width, height: h)
+            if b.isCurrent {
+                UsageTexture.hatch(clipped, part, color: stack.color(seg.agent))
+            } else {
+                clipped.fill(Path(part), with: .color(stack.color(seg.agent)))
+            }
+            y -= h
         }
     }
 
